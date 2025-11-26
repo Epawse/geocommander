@@ -1,33 +1,35 @@
-# GeoCommander-MCP
+# GeoCommander
 
-**基于大模型上下文协议（MCP）的自然语言驱动三维地理空间指挥官**
+**自然语言驱动的三维地理空间控制系统**
 
 > 一个创新的 WebGIS 应用，让用户通过自然语言控制 3D 地球可视化
 
-![GeoCommander](https://img.shields.io/badge/GeoCommander-MCP-blue)
+> **[开发中]** 本项目正在积极开发，功能可能会有变化
+
 ![React](https://img.shields.io/badge/React-19-61dafb)
 ![Cesium](https://img.shields.io/badge/Cesium-1.124-green)
 ![Python](https://img.shields.io/badge/Python-3.11+-yellow)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
-## ✨ 特性
+## 特性
 
-- 🗣️ **自然语言控制** - 用中文指令控制 3D 地球，如"飞到上海外滩"
-- 🌍 **3D 地球可视化** - 基于 Cesium 的高性能三维地球渲染
-- 🔌 **MCP 协议** - 标准化的大模型工具调用协议
-- 🌦️ **天气效果** - 雨、雪、雾等粒子系统天气模拟
-- 🌓 **昼夜切换** - 白天/夜晚/黎明/黄昏时间控制
-- 📍 **POI 标注** - 动态添加/删除地图标记点
-- 🗺️ **多源底图** - 天地图卫星、矢量、地形图层
-- 🎤 **语音输入** - 支持语音识别输入指令
+- **自然语言控制** - 用中文指令控制 3D 地球，如"飞到上海外滩"
+- **3D 地球可视化** - 基于 Cesium 的高性能三维地球渲染
+- **LLM 工具调用** - 借鉴 MCP 协议思想的工具调用机制
+- **天气效果** - 雨、雪、雾等粒子系统天气模拟
+- **昼夜切换** - 白天/夜晚/黎明/黄昏时间控制
+- **POI 标注** - 动态添加/删除地图标记点
+- **多源底图** - 天地图卫星、矢量、地形、深色图层
+- **多 LLM 支持** - Vertex AI (Gemini)、OpenAI、Ollama 等
 
-## 🏗️ 架构
+## 架构
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        用户界面 (React)                          │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
-│  │ CommandInput│  │  StatusBar  │  │    CesiumViewer          │ │
-│  │ (自然语言)   │  │ (MCP状态)   │  │    (3D渲染)             │ │
+│  │  ChatSidebar│  │  StatusBar  │  │    CesiumViewer          │ │
+│  │ (自然语言)   │  │  (连接状态) │  │    (3D渲染)             │ │
 │  └──────┬──────┘  └─────────────┘  └────────────▲────────────┘ │
 │         │                                        │              │
 │         │                              ┌─────────┴─────────┐    │
@@ -35,24 +37,18 @@
 │         │                              │  (JSON→Cesium)    │    │
 │         │                              └─────────▲─────────┘    │
 └─────────┼────────────────────────────────────────┼──────────────┘
-          │ WebSocket                              │ MCP Actions
+          │ WebSocket                              │ Actions
           │                                        │
 ┌─────────▼────────────────────────────────────────┴──────────────┐
-│                    MCP Server (Python FastAPI)                   │
+│                     后端服务 (Python FastAPI)                    │
 │  ┌───────────────┐  ┌─────────────┐  ┌────────────────────────┐ │
-│  │ IntentParser  │  │  MCP Tools  │  │  Location Database     │ │
-│  │ (意图解析)     │  │ (工具定义)  │  │  (地点知识库)          │ │
-│  └───────┬───────┘  └─────────────┘  └────────────────────────┘ │
-│          │                                                       │
-│          ▼ (可选)                                                │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                    LLM API Integration                     │  │
-│  │         Claude / GPT / Qwen / Local Models                 │  │
-│  └───────────────────────────────────────────────────────────┘  │
+│  │  LLM 集成     │  │  工具定义   │  │  地点知识库            │ │
+│  │ (多服务商)    │  │  (fly_to等) │  │  (城市/地标)           │ │
+│  └───────────────┘  └─────────────┘  └────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-## 🛠️ MCP 工具
+## 支持的工具
 
 | 工具 | 描述 | 示例指令 |
 |------|------|---------|
@@ -64,7 +60,7 @@
 | `clear_markers` | 清除标记 | "清除所有标记" |
 | `clear_weather` | 清除天气 | "清除天气效果" |
 
-## 🚀 快速开始
+## 快速开始
 
 ### 前端
 
@@ -76,7 +72,7 @@ npm install
 npm run dev
 ```
 
-### MCP Server
+### 后端
 
 ```bash
 cd mcp-server
@@ -84,10 +80,13 @@ cd mcp-server
 # 创建虚拟环境
 python -m venv venv
 source venv/bin/activate  # Linux/macOS
-# 或 venv\Scripts\activate  # Windows
 
 # 安装依赖
 pip install -r requirements.txt
+
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env 配置 LLM API
 
 # 启动服务
 python server.py
@@ -96,92 +95,63 @@ python server.py
 ### 访问应用
 
 - 前端: http://localhost:5173
-- MCP Server: ws://localhost:8765
+- 后端: ws://localhost:8765
 
-## 📁 项目结构
+## 项目结构
 
 ```
-geoscene/
+geocommander/
 ├── src/
-│   ├── components/          # React 组件
+│   ├── components/           # React 组件
 │   │   ├── CesiumViewer.tsx  # 3D 地球
-│   │   ├── CommandInput.tsx  # 自然语言输入
-│   │   ├── StatusBar.tsx     # MCP 状态栏
+│   │   ├── ChatSidebar.tsx   # 聊天界面
 │   │   └── ...
 │   ├── services/
-│   │   └── WebSocketService.ts  # WebSocket 客户端
+│   │   └── WebSocketService.ts
 │   ├── dispatcher/
-│   │   └── ActionDispatcher.ts  # MCP 动作分发
-│   ├── context/
-│   │   └── CesiumContext.tsx    # Cesium 上下文
+│   │   └── ActionDispatcher.ts
 │   └── config/
-│       └── mapConfig.ts         # 地图配置
+│       └── mapConfig.ts
 ├── mcp-server/
-│   ├── server.py           # MCP Server 主程序
-│   ├── requirements.txt    # Python 依赖
-│   └── .env.example        # 环境变量示例
+│   ├── server.py             # 后端主程序
+│   ├── llm_providers.py      # LLM 服务商管理
+│   ├── requirements.txt
+│   └── .env.example
 └── package.json
 ```
 
-## 🎯 示例指令
+## 示例指令
 
 ```
-飞到北京天安门广场上空 1000 米
-切换到卫星影像图
-在上海东方明珠塔位置添加一个红色标记
-显示下雨天气效果
-将时间设置为夜晚
-清除所有标记点
-飞到珠穆朗玛峰，高度 15000 米
-显示大雪效果
-切换到黎明时分
+飞到北京天安门
+切换到卫星图
+下雨
+夜间模式
+在武汉大学添加标记
+重置视角
 ```
 
-## 🔧 配置 LLM（可选）
+## LLM 配置
 
-MCP Server 默认使用规则匹配解析指令。如需启用 LLM 进行更智能的意图理解：
-
-1. 复制 `.env.example` 为 `.env`
-2. 配置 API Key:
+支持多种 LLM 服务商，在 `.env` 中配置：
 
 ```env
 USE_LLM=true
-ANTHROPIC_API_KEY=your_claude_api_key
+
+# Google Vertex AI (Gemini) - 推荐
+VERTEX_PROJECT_ID=your-project-id
+VERTEX_CLIENT_EMAIL=your-service-account@...
+VERTEX_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----...
+VERTEX_MODEL=gemini-2.5-flash-lite
+
+# 或 OpenAI
+# OPENAI_API_KEY=sk-...
+
+# 或本地 Ollama
+# OLLAMA_BASE_URL=http://localhost:11434/v1
+# OLLAMA_MODEL=qwen2.5:7b
 ```
 
-支持的 LLM：
-- Anthropic Claude
-- OpenAI GPT
-- 阿里云 Qwen
-- 本地 Ollama
-
-## 📝 开发说明
-
-### 添加新的 MCP 工具
-
-1. 在 `mcp-server/server.py` 中的 `MCP_TOOLS` 列表添加工具定义
-2. 在 `IntentParser` 类中添加解析规则
-3. 在前端 `ActionDispatcher.ts` 中实现对应的 Cesium 操作
-
-### 添加新地点
-
-编辑 `mcp-server/server.py` 中的 `LOCATIONS` 字典：
-
-```python
-LOCATIONS["新地点"] = Location(
-    name="新地点名称",
-    longitude=116.0,
-    latitude=40.0,
-    altitude=5000
-)
-```
-
-## 📄 License
+## License
 
 MIT
-
-## 🙏 致谢
-
-- [Cesium](https://cesium.com/) - 3D 地球引擎
-- [天地图](https://www.tianditu.gov.cn/) - 地图服务
-- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP 协议规范

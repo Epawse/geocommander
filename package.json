@@ -1,8 +1,8 @@
 {
   "name": "geocommander",
   "private": true,
-  "version": "1.0.0",
-  "description": "GeoCommander-MCP: 基于大模型上下文协议的自然语言驱动三维地理空间指挥官",
+  "version": "0.1.0",
+  "description": "GeoCommander: 自然语言驱动的三维地理空间控制系统",
   "type": "module",
   "scripts": {
     "dev": "vite",
