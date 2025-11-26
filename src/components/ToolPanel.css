@@ -1,0 +1,116 @@
+.tool-panel {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+}
+
+.tool-group {
+  display: flex;
+  flex-direction: column;
+  background: rgba(38, 38, 38, 0.9);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tool-button {
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  position: relative;
+}
+
+/* 确保 SVG 图标正确显示 */
+.tool-button svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: block;
+}
+
+.tool-button:hover {
+  background: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+}
+
+.tool-button:active {
+  background: rgba(96, 165, 250, 0.3);
+}
+
+.tool-button + .tool-button {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Tooltip */
+.tool-button::after {
+  content: attr(title);
+  position: absolute;
+  right: 50px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s;
+  pointer-events: none;
+}
+
+.tool-button::before {
+  content: '';
+  position: absolute;
+  right: 44px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-left-color: rgba(0, 0, 0, 0.85);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s;
+}
+
+.tool-button:hover::after,
+.tool-button:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Active state */
+.tool-button.active {
+  background: rgba(96, 165, 250, 0.3);
+  color: #60a5fa;
+}
+
+@media (max-width: 768px) {
+  .tool-panel {
+    top: auto;
+    bottom: 20px;
+    right: 10px;
+  }
+  
+  .tool-button {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .tool-button::after,
+  .tool-button::before {
+    display: none;
+  }
+}
