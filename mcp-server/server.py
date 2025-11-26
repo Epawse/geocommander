@@ -405,11 +405,13 @@ class ChatAssistant:
 - dawn = 黎明、日出、清晨
 - dusk = 黄昏、日落、傍晚
 
-### add_marker - 添加标记
+### add_marker - 添加标记（会自动飞往该位置）
 参数：name, longitude, latitude, color（默认#FF4444）
+注意：添加标记后，前端会自动飞往该位置
 
 ### clear_markers - 清除标记
-### clear_weather - 清除天气（重置、复位也用这个）
+### clear_weather - 清除天气（停止天气效果）
+### reset_view - 重置视角（回到初始视角、返回初始位置）
 
 ## 回复格式 (JSON)
 {"message": "简短说明", "tool_call": {"action": "工具名", "arguments": {...}}}
@@ -424,11 +426,19 @@ class ChatAssistant:
 
 "泰姬陵" → {"message": "🛫 飞往泰姬陵", "tool_call": {"action": "fly_to", "arguments": {"longitude": 78.0421, "latitude": 27.1751, "altitude": 500, "duration": 2}}}
 
+"在武汉大学添加标记" → {"message": "📍 在武汉大学添加标记", "tool_call": {"action": "add_marker", "arguments": {"name": "武汉大学", "longitude": 114.3612, "latitude": 30.5371}}}
+
+"标记故宫" → {"message": "📍 标记故宫", "tool_call": {"action": "add_marker", "arguments": {"name": "故宫", "longitude": 116.3972, "latitude": 39.9169}}}
+
 "浅色" → {"message": "🗺️ 切换到标准地图", "tool_call": {"action": "switch_basemap", "arguments": {"type": "vector"}}}
 
 "暴雪" → {"message": "❄️ 开启暴雪", "tool_call": {"action": "set_weather", "arguments": {"type": "snow", "intensity": 0.8}}}
 
 "日落" → {"message": "🌅 设置黄昏", "tool_call": {"action": "set_time", "arguments": {"preset": "dusk"}}}
+
+"停止天气" → {"message": "☀️ 天气已清除", "tool_call": {"action": "clear_weather", "arguments": {}}}
+
+"重置视角" → {"message": "🔄 视角已重置", "tool_call": {"action": "reset_view", "arguments": {}}}
 
 "你好" → {"message": "❌ 无法识别\\n\\n可用：导航任意地点、底图切换、天气效果、时间设置\\n💡 闲聊请用「对话模式」", "tool_call": null}'''
 
@@ -456,11 +466,13 @@ class ChatAssistant:
 ### set_time - 时间
 参数：preset = day | night | dawn | dusk
 
-### add_marker - 添加标记
+### add_marker - 添加标记（会自动飞往该位置）
 参数：name, longitude, latitude, color（默认#FF4444）
+注意：添加标记后，前端会自动飞往该位置
 
 ### clear_markers - 清除标记
-### clear_weather - 清除天气
+### clear_weather - 清除天气（停止天气效果）
+### reset_view - 重置视角（回到初始视角、返回初始位置）
 
 ## 回复格式 (JSON) - 必须包含 thinking 字段
 {
@@ -477,10 +489,28 @@ class ChatAssistant:
   "tool_call": {"action": "fly_to", "arguments": {"longitude": 114.3612, "latitude": 30.5371, "altitude": 500, "duration": 2}}
 }
 
+"在故宫添加标记" → {
+  "thinking": "用户想在故宫位置添加一个标记点。故宫位于北京市中心，坐标约(116.3972, 39.9169)。添加标记后前端会自动飞往",
+  "message": "📍 在故宫添加标记",
+  "tool_call": {"action": "add_marker", "arguments": {"name": "故宫", "longitude": 116.3972, "latitude": 39.9169}}
+}
+
 "暗色地图" → {
   "thinking": "用户想切换底图样式为暗色/深色主题，对应 dark 类型",
   "message": "🗺️ 切换到深色地图",
   "tool_call": {"action": "switch_basemap", "arguments": {"type": "dark"}}
+}
+
+"停止天气" → {
+  "thinking": "用户想清除当前天气效果，使用 clear_weather 命令",
+  "message": "☀️ 天气已清除",
+  "tool_call": {"action": "clear_weather", "arguments": {}}
+}
+
+"重置视角" → {
+  "thinking": "用户想重置视角回到初始位置，使用 reset_view 命令",
+  "message": "🔄 视角已重置",
+  "tool_call": {"action": "reset_view", "arguments": {}}
 }
 
 "你是谁" → {

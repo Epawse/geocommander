@@ -19,10 +19,186 @@ export type ActionType =
   | 'set_weather'
   | 'clear_weather'
   | 'set_time'
+  | 'reset_view'
   | 'get_camera_position'
   | 'measure_distance'
   | 'draw_polygon'
   | 'highlight_area';
+
+// 雨效果 Shader - 使用 Cesium GLSL ES 3.0 语法
+// Cesium 会自动提供: in vec2 v_textureCoordinates, uniform sampler2D colorTexture
+const rainFragmentShader = `
+uniform sampler2D colorTexture;
+uniform float time;
+uniform float intensity;
+
+in vec2 v_textureCoordinates;
+
+// 随机函数
+float N21(vec2 p) {
+  p = fract(p * vec2(233.34, 851.74));
+  p += dot(p, p + 23.45);
+  return fract(p.x * p.y);
+}
+
+// 雨滴图层
+vec3 rainLayer(vec2 uv, float t, float scale) {
+  vec2 aspect = vec2(2.0, 1.0);
+  vec2 uvScaled = uv * scale * aspect;
+  uvScaled.y += t * 0.25;
+  
+  vec2 gv = fract(uvScaled) - 0.5;
+  vec2 id = floor(uvScaled);
+  
+  float n = N21(id);
+  t += n * 6.283;
+  
+  float w = uv.y * 10.0;
+  float x = (n - 0.5) * 0.8;
+  x += (0.4 - abs(x)) * sin(3.0 * w) * pow(sin(w), 6.0) * 0.45;
+  
+  float y = -sin(t + sin(t + sin(t) * 0.5)) * 0.45;
+  y -= (gv.x - x) * (gv.x - x);
+  
+  vec2 dropPos = (gv - vec2(x, y)) / aspect;
+  float drop = smoothstep(0.05, 0.03, length(dropPos));
+  
+  vec2 trailPos = (gv - vec2(x, t * 0.25)) / aspect;
+  trailPos.y = (fract(trailPos.y * 8.0) - 0.5) / 8.0;
+  float trail = smoothstep(0.03, 0.01, length(trailPos));
+  
+  float fogTrail = smoothstep(-0.05, 0.05, dropPos.y);
+  fogTrail *= smoothstep(0.5, y, gv.y);
+  trail *= fogTrail;
+  fogTrail *= smoothstep(0.05, 0.04, abs(dropPos.x));
+  
+  return vec3(drop + trail + fogTrail * 0.5);
+}
+
+void main(void) {
+  vec4 sceneColor = texture(colorTexture, v_textureCoordinates);
+  vec2 uv = v_textureCoordinates;
+  uv.y = 1.0 - uv.y;
+  
+  float t = time * 0.5;
+  
+  vec3 rain = vec3(0.0);
+  rain += rainLayer(uv, t, 20.0) * 0.5;
+  rain += rainLayer(uv * 1.5 + 0.5, t * 1.2, 30.0) * 0.35;
+  rain += rainLayer(uv * 2.0 + 0.3, t * 0.8, 40.0) * 0.25;
+  
+  vec3 rainColor = vec3(0.7, 0.8, 1.0);
+  vec3 finalColor = mix(sceneColor.rgb, rainColor, rain.r * intensity * 0.6);
+  finalColor *= 1.0 - intensity * 0.2;
+  
+  out_FragColor = vec4(finalColor, sceneColor.a);
+}
+`;
+
+// 雪效果 Shader
+const snowFragmentShader = `
+uniform sampler2D colorTexture;
+uniform float time;
+uniform float intensity;
+
+in vec2 v_textureCoordinates;
+
+// 随机函数
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+// 雪花图层
+float snowLayer(vec2 uv, float scale, float speed, float size) {
+  uv = uv * scale;
+  uv.y += time * speed;
+  uv.x += sin(uv.y * 0.5 + time * 0.3) * 0.3;
+  
+  vec2 id = floor(uv);
+  vec2 gv = fract(uv) - 0.5;
+  
+  float h = hash(id);
+  float xOffset = (h - 0.5) * 0.6;
+  float yOffset = sin(time * (0.5 + h) + h * 6.283) * 0.3;
+  
+  vec2 snowPos = gv - vec2(xOffset, yOffset);
+  float snowSize = size * (0.5 + h * 0.5);
+  
+  return smoothstep(snowSize, snowSize * 0.3, length(snowPos));
+}
+
+void main(void) {
+    vec4 sceneColor = texture(colorTexture, v_textureCoordinates);
+    vec2 uv = v_textureCoordinates;
+    
+    float snow = 0.0;
+    snow += snowLayer(uv, 8.0, 0.15, 0.08) * 1.0;
+    snow += snowLayer(uv + 0.1, 12.0, 0.2, 0.06) * 0.8;
+    snow += snowLayer(uv + 0.2, 16.0, 0.25, 0.05) * 0.6;
+    snow += snowLayer(uv + 0.3, 24.0, 0.3, 0.04) * 0.4;
+    
+    snow = clamp(snow, 0.0, 1.0);
+    
+    vec3 snowColor = vec3(1.0, 1.0, 1.0);
+    vec3 finalColor = mix(sceneColor.rgb, snowColor, snow * intensity * 0.8);
+    finalColor = mix(finalColor, vec3(0.85, 0.88, 0.92), intensity * 0.15);
+    
+    out_FragColor = vec4(finalColor, sceneColor.a);
+  }
+`;
+
+// 雾效果 Shader - 使用 Cesium GLSL ES 3.0 语法
+const fogFragmentShader = `
+uniform sampler2D colorTexture;
+uniform float intensity;
+uniform float time;
+
+in vec2 v_textureCoordinates;
+
+// 噪声函数
+float noise(vec2 p) {
+  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+float smoothNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  
+  float a = noise(i);
+  float b = noise(i + vec2(1.0, 0.0));
+  float c = noise(i + vec2(0.0, 1.0));
+  float d = noise(i + vec2(1.0, 1.0));
+  
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbm(vec2 p) {
+  float value = 0.0;
+  float amplitude = 0.5;
+  for (int i = 0; i < 4; i++) {
+    value += amplitude * smoothNoise(p);
+    p *= 2.0;
+    amplitude *= 0.5;
+  }
+  return value;
+}
+
+void main(void) {
+  vec4 sceneColor = texture(colorTexture, v_textureCoordinates);
+  
+  vec2 uv = v_textureCoordinates;
+  float fog = fbm(uv * 3.0 + time * 0.05);
+  fog = fog * 0.5 + 0.5;
+  vec3 fogColor = vec3(0.8, 0.82, 0.85);
+  
+  float fogAmount = fog * intensity * 0.7;
+  
+  vec3 finalColor = mix(sceneColor.rgb, fogColor, fogAmount);
+  
+  out_FragColor = vec4(finalColor, sceneColor.a);
+}
+`;
 
 // 动作参数类型定义
 export interface FlyToParams {
@@ -92,7 +268,8 @@ export interface HighlightAreaParams {
  */
 export class ActionDispatcher {
   private markers: Map<string, Cesium.Entity> = new Map();
-  private weatherSystem: Cesium.ParticleSystem | null = null;
+  private weatherStage: Cesium.PostProcessStage | null = null;
+  private weatherStartTime: number = 0;
   private polygons: Map<string, Cesium.Entity> = new Map();
 
   /**
@@ -183,6 +360,9 @@ export class ActionDispatcher {
       case 'set_time':
         return this.setTime(payload as unknown as SetTimeParams);
       
+      case 'reset_view':
+        return this.resetView();
+      
       case 'get_camera_position':
         return this.getCameraPosition();
       
@@ -263,9 +443,9 @@ export class ActionDispatcher {
   }
 
   /**
-   * 添加标记点
+   * 添加标记点（添加后自动飞往该位置）
    */
-  private addMarker(params: AddMarkerParams): { id: string; message: string } {
+  private async addMarker(params: AddMarkerParams): Promise<{ id: string; message: string }> {
     const id = params.id || crypto.randomUUID();
     const { name, longitude, latitude, altitude = 0, color = '#FF4444', description = '' } = params;
 
@@ -300,6 +480,15 @@ export class ActionDispatcher {
     });
 
     this.markers.set(id, entity);
+
+    // 添加标记后自动飞往该位置
+    await this.flyTo({
+      longitude,
+      latitude,
+      altitude: 1000,  // 使用较低高度以便看清标记
+      duration: 2
+    });
+
     return { id, message: `Added marker "${name}" at [${longitude}, ${latitude}]` };
   }
 
@@ -329,7 +518,8 @@ export class ActionDispatcher {
   }
 
   /**
-   * 设置天气效果
+   * 设置天气效果 - 使用 PostProcessStage 实现屏幕空间效果
+   * 这种方式比粒子系统更可靠，效果更明显
    */
   private setWeather(params: SetWeatherParams): { message: string } {
     const { type, intensity = 0.5 } = params;
@@ -341,163 +531,100 @@ export class ActionDispatcher {
       return { message: 'Weather cleared' };
     }
 
-    // 根据天气类型创建粒子系统
-    const scene = this.viewer!.scene;
-    const camera = this.viewer!.camera;
-
-    // 粒子发射器配置
-    const emitterConfig = this.getWeatherEmitterConfig(type, intensity);
+    const viewer = this.viewer!;
+    const scene = viewer.scene;
     
-    this.weatherSystem = scene.primitives.add(new Cesium.ParticleSystem({
-      modelMatrix: this.computeWeatherModelMatrix(camera),
-      speed: emitterConfig.speed,
-      lifetime: emitterConfig.lifetime,
-      emitter: new Cesium.BoxEmitter(new Cesium.Cartesian3(
-        emitterConfig.boxWidth,
-        emitterConfig.boxWidth,
-        emitterConfig.boxHeight
-      )),
-      emissionRate: emitterConfig.emissionRate,
-      startColor: emitterConfig.startColor,
-      endColor: emitterConfig.endColor,
-      startScale: emitterConfig.startScale,
-      endScale: emitterConfig.endScale,
-      minimumImageSize: new Cesium.Cartesian2(emitterConfig.imageSize, emitterConfig.imageSize),
-      maximumImageSize: new Cesium.Cartesian2(emitterConfig.imageSize * 1.5, emitterConfig.imageSize * 1.5),
-      image: emitterConfig.image
-    }) as Cesium.ParticleSystem);
+    // 记录开始时间用于动画
+    this.weatherStartTime = performance.now();
 
-    // 跟随相机更新粒子系统位置
-    this.viewer!.scene.preUpdate.addEventListener(() => {
-      if (this.weatherSystem) {
-        this.weatherSystem.modelMatrix = this.computeWeatherModelMatrix(camera);
+    // 根据天气类型选择 shader
+    let fragmentShader: string;
+    let atmosphereSettings: { hue: number; saturation: number; brightness: number };
+
+    if (type === 'snow') {
+      fragmentShader = snowFragmentShader;
+      atmosphereSettings = { hue: -0.8, saturation: -0.7, brightness: -0.33 };
+    } else if (type === 'rain') {
+      fragmentShader = rainFragmentShader;
+      atmosphereSettings = { hue: -0.97, saturation: 0.25, brightness: -0.4 };
+    } else if (type === 'fog') {
+      fragmentShader = fogFragmentShader;
+      atmosphereSettings = { hue: 0, saturation: -0.3, brightness: -0.2 };
+    } else {
+      return { message: `Unknown weather type: ${type}` };
+    }
+
+    // 保存原始大气设置
+    this.originalAtmosphereSettings = {
+      hueShift: scene.skyAtmosphere?.hueShift ?? 0,
+      saturationShift: scene.skyAtmosphere?.saturationShift ?? 0,
+      brightnessShift: scene.skyAtmosphere?.brightnessShift ?? 0,
+      fogDensity: scene.fog.density,
+      fogMinimumBrightness: scene.fog.minimumBrightness
+    };
+
+    // 创建 PostProcessStage
+    const startTime = this.weatherStartTime;
+    this.weatherStage = new Cesium.PostProcessStage({
+      fragmentShader: fragmentShader,
+      uniforms: {
+        time: () => (performance.now() - startTime) / 1000.0,
+        intensity: intensity
       }
     });
 
+    scene.postProcessStages.add(this.weatherStage);
+
+    // 调整大气效果
+    if (scene.skyAtmosphere) {
+      scene.skyAtmosphere.hueShift = atmosphereSettings.hue;
+      scene.skyAtmosphere.saturationShift = atmosphereSettings.saturation;
+      scene.skyAtmosphere.brightnessShift = atmosphereSettings.brightness;
+    }
+
+    // 雾效果特殊处理
+    if (type === 'fog') {
+      scene.fog.density = 0.0003 * intensity + 0.0001;
+      scene.fog.minimumBrightness = 0.8;
+    }
+
+    console.log(`[ActionDispatcher] Weather effect created using PostProcessStage: ${type}, intensity: ${intensity}`);
     return { message: `Set weather to ${type} with intensity ${intensity}` };
   }
 
-  /**
-   * 获取天气粒子配置
-   */
-  private getWeatherEmitterConfig(type: 'rain' | 'snow' | 'fog', intensity: number) {
-    const baseRate = 500 * intensity;
-    
-    const configs = {
-      rain: {
-        speed: 100,
-        lifetime: 1.5,
-        boxWidth: 100,
-        boxHeight: 100,
-        emissionRate: baseRate * 2,
-        startColor: new Cesium.Color(0.7, 0.7, 0.9, 0.5),
-        endColor: new Cesium.Color(0.5, 0.5, 0.8, 0.3),
-        startScale: 0.3,
-        endScale: 0.1,
-        imageSize: 2,
-        image: this.createRaindropImage()
-      },
-      snow: {
-        speed: 20,
-        lifetime: 8,
-        boxWidth: 100,
-        boxHeight: 50,
-        emissionRate: baseRate,
-        startColor: Cesium.Color.WHITE.withAlpha(0.9),
-        endColor: Cesium.Color.WHITE.withAlpha(0.5),
-        startScale: 1.0,
-        endScale: 0.5,
-        imageSize: 8,
-        image: this.createSnowflakeImage()
-      },
-      fog: {
-        speed: 5,
-        lifetime: 15,
-        boxWidth: 200,
-        boxHeight: 30,
-        emissionRate: baseRate * 0.3,
-        startColor: new Cesium.Color(0.8, 0.8, 0.8, 0.3),
-        endColor: new Cesium.Color(0.9, 0.9, 0.9, 0.1),
-        startScale: 5,
-        endScale: 15,
-        imageSize: 50,
-        image: this.createFogImage()
-      }
-    };
-
-    return configs[type];
-  }
-
-  /**
-   * 创建雨滴纹理
-   */
-  private createRaindropImage(): string {
-    const canvas = document.createElement('canvas');
-    canvas.width = 4;
-    canvas.height = 16;
-    const ctx = canvas.getContext('2d')!;
-    const gradient = ctx.createLinearGradient(2, 0, 2, 16);
-    gradient.addColorStop(0, 'rgba(200, 200, 255, 0.8)');
-    gradient.addColorStop(1, 'rgba(150, 150, 200, 0.2)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(1, 0, 2, 16);
-    return canvas.toDataURL();
-  }
-
-  /**
-   * 创建雪花纹理
-   */
-  private createSnowflakeImage(): string {
-    const canvas = document.createElement('canvas');
-    canvas.width = 16;
-    canvas.height = 16;
-    const ctx = canvas.getContext('2d')!;
-    const gradient = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.8)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(8, 8, 8, 0, Math.PI * 2);
-    ctx.fill();
-    return canvas.toDataURL();
-  }
-
-  /**
-   * 创建雾气纹理
-   */
-  private createFogImage(): string {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d')!;
-    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    gradient.addColorStop(0, 'rgba(200, 200, 200, 0.4)');
-    gradient.addColorStop(0.5, 'rgba(180, 180, 180, 0.2)');
-    gradient.addColorStop(1, 'rgba(160, 160, 160, 0)');
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(32, 32, 32, 0, Math.PI * 2);
-    ctx.fill();
-    return canvas.toDataURL();
-  }
-
-  /**
-   * 计算天气粒子系统的模型矩阵
-   */
-  private computeWeatherModelMatrix(camera: Cesium.Camera): Cesium.Matrix4 {
-    const position = camera.positionWC;
-    return Cesium.Transforms.eastNorthUpToFixedFrame(position);
-  }
+  // 原始大气设置，用于恢复
+  private originalAtmosphereSettings: {
+    hueShift: number;
+    saturationShift: number;
+    brightnessShift: number;
+    fogDensity: number;
+    fogMinimumBrightness: number;
+  } | null = null;
 
   /**
    * 清除天气效果
    */
   private clearWeather(): { message: string } {
-    if (this.weatherSystem) {
-      this.viewer!.scene.primitives.remove(this.weatherSystem);
-      this.weatherSystem = null;
+    // 移除 PostProcessStage
+    if (this.weatherStage && this.viewer) {
+      this.viewer.scene.postProcessStages.remove(this.weatherStage);
+      this.weatherStage = null;
+      console.log('[ActionDispatcher] Weather PostProcessStage cleared');
     }
+
+    // 恢复大气设置
+    if (this.originalAtmosphereSettings && this.viewer) {
+      const scene = this.viewer.scene;
+      if (scene.skyAtmosphere) {
+        scene.skyAtmosphere.hueShift = this.originalAtmosphereSettings.hueShift;
+        scene.skyAtmosphere.saturationShift = this.originalAtmosphereSettings.saturationShift;
+        scene.skyAtmosphere.brightnessShift = this.originalAtmosphereSettings.brightnessShift;
+      }
+      scene.fog.density = this.originalAtmosphereSettings.fogDensity;
+      scene.fog.minimumBrightness = this.originalAtmosphereSettings.fogMinimumBrightness;
+      this.originalAtmosphereSettings = null;
+    }
+
     return { message: 'Weather cleared' };
   }
 
@@ -529,6 +656,26 @@ export class ActionDispatcher {
     this.viewer!.scene.globe.enableLighting = true;
 
     return { message: `Time set to ${params.datetime || params.preset}` };
+  }
+
+  /**
+   * 重置视角到默认位置（中国全景）
+   */
+  private resetView(): { message: string } {
+    const viewer = this.viewer!;
+    
+    // 飞到中国中心位置，展示全景
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(104.0, 35.0, 8000000), // 中国中心，高度8000km
+      orientation: {
+        heading: Cesium.Math.toRadians(0),
+        pitch: Cesium.Math.toRadians(-90), // 俯视
+        roll: 0
+      },
+      duration: 2
+    });
+
+    return { message: '视角已重置' };
   }
 
   /**

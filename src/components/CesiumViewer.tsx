@@ -31,9 +31,8 @@ export function CesiumViewer() {
       baseLayerPicker: false,
       // 启用地形
       terrain: undefined,
-      // 地球设置
-      requestRenderMode: true,
-      maximumRenderTimeChange: Infinity,
+      // 渲染设置 - 不使用 requestRenderMode 以支持粒子动画
+      requestRenderMode: false,
     });
 
     // 移除默认的 Cesium 底图
