@@ -155,3 +155,9 @@ VERTEX_MODEL=gemini-2.5-flash-lite
 ## License
 
 MIT
+
+---
+
+## 相关项目
+
+- [mcp-geo-tools](https://github.com/epawse/mcp-geo-tools) - 标准 MCP Server 实现（规划中）
