@@ -48,6 +48,7 @@ class WebSocketService {
   private status: ConnectionStatus = 'disconnected';
   private heartbeatInterval: number | null = null;
   private messageQueue: MCPAction[] = [];
+  private lastChatToolCallId: string | null = null; // 追踪 chat_response 已处理的 tool_call
 
   constructor(url: string = 'ws://localhost:8765/ws') {
     this.url = url;
@@ -185,8 +186,12 @@ class WebSocketService {
 
         // 如果有工具调用，也要处理
         if (message.tool_call && this.actionHandler) {
+          const actionId = message.tool_call.id || crypto.randomUUID();
+          // 记录已处理的 tool_call ID，避免后续 action 消息重复执行
+          this.lastChatToolCallId = actionId;
+
           const action: MCPAction = {
-            id: message.id || crypto.randomUUID(),
+            id: actionId,
             action: message.tool_call.action,
             payload: message.tool_call.arguments || {},
             timestamp: Date.now()
@@ -199,14 +204,29 @@ class WebSocketService {
         return;
       }
 
-      // MCP 动作 (兼容旧格式 - 当 chat_response 已处理时跳过)
-      // 注意：后端同时发送 chat_response 和 action，为避免重复执行，
-      // 如果 chat_response 已经处理了 tool_call，这里就不再处理
+      // MCP 动作 (来自 /mcp/call API 或其他直接调用)
       if (message.type === 'action' && message.payload) {
-        // 检查是否已经通过 chat_response 处理过（通过 ID 判断）
-        // 由于后端对 chat_response 和 action 使用不同的 ID，这里简单跳过
-        // 因为 chat_response 分支已经处理了工具调用
-        console.log('[WebSocket] Skipping duplicate action (handled by chat_response):', message.payload.action);
+        // 检查是否已经通过 chat_response 处理过
+        // 只有当 action ID 与 lastChatToolCallId 相同时才跳过
+        if (this.lastChatToolCallId && message.id === this.lastChatToolCallId) {
+          console.log('[WebSocket] Skipping duplicate action (already handled by chat_response):', message.payload.action);
+          this.lastChatToolCallId = null; // 清除，避免影响后续
+          return;
+        }
+
+        // 处理来自 DebugPanel /mcp/call 或其他来源的直接 action
+        if (this.actionHandler) {
+          const action: MCPAction = {
+            id: message.id || crypto.randomUUID(),
+            action: message.payload.action,
+            payload: message.payload.arguments || {},
+            timestamp: Date.now()
+          };
+
+          console.log('[WebSocket] Executing direct action:', action);
+          const response = await this.actionHandler(action);
+          this.sendResponse(response);
+        }
         return;
       }
 

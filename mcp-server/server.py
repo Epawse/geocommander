@@ -48,13 +48,6 @@ class Location(BaseModel):
     altitude: Optional[float] = 5000
 
 
-class MCPTool(BaseModel):
-    """MCP 工具定义"""
-    name: str
-    description: str
-    parameters: Dict[str, Any]
-
-
 class MCPToolCall(BaseModel):
     """MCP 工具调用"""
     id: str
@@ -177,108 +170,9 @@ TIME_PRESETS = {
     "傍晚": "dusk",
 }
 
-# ===================== MCP 工具定义 =====================
-
-MCP_TOOLS: List[MCPTool] = [
-    MCPTool(
-        name="fly_to",
-        description="飞行到指定位置。支持城市名称、景点名称或经纬度坐标。",
-        parameters={
-            "type": "object",
-            "properties": {
-                "longitude": {"type": "number", "description": "经度 (-180 到 180)"},
-                "latitude": {"type": "number", "description": "纬度 (-90 到 90)"},
-                "altitude": {"type": "number", "description": "高度（米）", "default": 5000},
-                "duration": {"type": "number", "description": "飞行时间（秒）", "default": 2},
-            },
-            "required": ["longitude", "latitude"]
-        }
-    ),
-    MCPTool(
-        name="switch_basemap",
-        description="切换底图类型。支持卫星影像、矢量地图、地形图、深色主题。",
-        parameters={
-            "type": "object",
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "enum": ["satellite", "vector", "terrain", "dark"],
-                    "description": "底图类型"
-                }
-            },
-            "required": ["type"]
-        }
-    ),
-    MCPTool(
-        name="add_marker",
-        description="在地图上添加标记点。",
-        parameters={
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "description": "标记名称"},
-                "longitude": {"type": "number", "description": "经度"},
-                "latitude": {"type": "number", "description": "纬度"},
-                "color": {"type": "string", "description": "颜色（CSS格式）", "default": "#FF4444"},
-                "description": {"type": "string", "description": "描述信息"}
-            },
-            "required": ["name", "longitude", "latitude"]
-        }
-    ),
-    MCPTool(
-        name="set_weather",
-        description="设置天气效果。支持雨、雪、雾等天气。",
-        parameters={
-            "type": "object",
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "enum": ["rain", "snow", "fog", "clear"],
-                    "description": "天气类型"
-                },
-                "intensity": {
-                    "type": "number",
-                    "description": "强度 (0-1)",
-                    "default": 0.5
-                }
-            },
-            "required": ["type"]
-        }
-    ),
-    MCPTool(
-        name="set_time",
-        description="设置场景时间。可以设置具体时间或使用预设（白天、夜晚、黎明、黄昏）。",
-        parameters={
-            "type": "object",
-            "properties": {
-                "preset": {
-                    "type": "string",
-                    "enum": ["day", "night", "dawn", "dusk"],
-                    "description": "时间预设"
-                },
-                "datetime": {
-                    "type": "string",
-                    "description": "ISO 8601 格式的日期时间"
-                }
-            }
-        }
-    ),
-    MCPTool(
-        name="clear_markers",
-        description="清除所有标记点。",
-        parameters={
-            "type": "object",
-            "properties": {}
-        }
-    ),
-    MCPTool(
-        name="clear_weather",
-        description="清除天气效果。",
-        parameters={
-            "type": "object",
-            "properties": {}
-        }
-    ),
-]
+# ===================== MCP 工具 =====================
+# 工具定义现在由 mcp-geo-tools 包提供，通过 MCP 协议动态获取
+# 参见 /mcp/tools 端点获取当前可用工具列表
 
 # ===================== 意图解析器 =====================
 
@@ -1173,10 +1067,21 @@ async def root():
 
 @app.get("/tools")
 async def get_tools():
-    """获取所有 MCP 工具定义"""
-    return {
-        "tools": [tool.model_dump() for tool in MCP_TOOLS]
-    }
+    """获取所有 MCP 工具定义（从 MCP Server 获取）"""
+    mcp_client = get_mcp_client()
+    if mcp_client.connected:
+        return {
+            "tools": [
+                {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": t.input_schema
+                }
+                for t in mcp_client.tools
+            ]
+        }
+    # MCP 未连接时返回空列表
+    return {"tools": [], "error": "MCP not connected"}
 
 
 @app.get("/locations")
