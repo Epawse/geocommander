@@ -8,12 +8,13 @@ import './ScenePanel.css';
 interface ScenePanelProps {
   isOpen: boolean;
   onClose: () => void;
+  isChatOpen?: boolean;
 }
 
 const RECENT_SCENES_KEY = 'geocommander_recent_scenes';
 const MAX_RECENT_SCENES = 6;
 
-export function ScenePanel({ isOpen, onClose }: ScenePanelProps) {
+export function ScenePanel({ isOpen, onClose, isChatOpen = true }: ScenePanelProps) {
   const { flyTo, setCurrentScene, currentScene } = useCesium();
   const [recentScenes, setRecentScenes] = useState<Scene[]>([]);
 
@@ -79,7 +80,7 @@ export function ScenePanel({ isOpen, onClose }: ScenePanelProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="scene-panel">
+    <div className={`scene-panel ${!isChatOpen ? 'chat-collapsed' : ''}`}>
       <div className="scene-panel-header">
         <h2>场景库</h2>
         <button className="close-button" onClick={onClose}>

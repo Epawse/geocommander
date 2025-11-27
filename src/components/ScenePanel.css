@@ -12,6 +12,12 @@
   backdrop-filter: blur(10px);
   animation: slideIn 0.3s ease;
   border-right: 1px solid var(--border-primary);
+  transition: left 0.25s ease;
+}
+
+/* 当 ChatSidebar 折叠时调整位置 */
+.scene-panel.chat-collapsed {
+  left: 0;
 }
 
 @keyframes slideIn {

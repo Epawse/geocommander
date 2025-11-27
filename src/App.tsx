@@ -244,6 +244,7 @@ function App() {
               <ScenePanel
                 isOpen={isScenePanelOpen}
                 onClose={() => setIsScenePanelOpen(false)}
+                isChatOpen={isChatOpen}
               />
 
               <LayerPanel
