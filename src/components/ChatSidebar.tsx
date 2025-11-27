@@ -24,9 +24,12 @@ import {
   Terminal,
   MessageCircle,
   Brain,
-  Wrench
+  Wrench,
+  WifiOff,
+  RefreshCw
 } from 'lucide-react';
 import ModelSelector from './ModelSelector';
+import { wsService } from '../services/WebSocketService';
 import './ChatSidebar.css';
 
 // 消息类型
@@ -192,10 +195,23 @@ export default function ChatSidebar({
   isConnected
 }: ChatSidebarProps) {
   const [input, setInput] = useState('');
-  const [chatMode, setChatMode] = useState<ChatMode>('command'); // 默认命令模式
-  const [thinkingEnabled, setThinkingEnabled] = useState(false); // 思考模式开关
+  const [chatMode, setChatMode] = useState<ChatMode>('command');
+  const [thinkingEnabled, setThinkingEnabled] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // 重连处理
+  const handleReconnect = async () => {
+    setIsReconnecting(true);
+    try {
+      await wsService.connect();
+    } catch (e) {
+      console.error('Reconnect failed:', e);
+    } finally {
+      setIsReconnecting(false);
+    }
+  };
 
   // 自动滚动到底部
   useEffect(() => {
@@ -265,6 +281,22 @@ export default function ChatSidebar({
           </button>
         </div>
       </div>
+
+      {/* 断连提示横幅 */}
+      {!isConnected && (
+        <div className="disconnect-banner">
+          <WifiOff size={16} />
+          <span>MCP 服务未连接</span>
+          <button
+            className="reconnect-btn"
+            onClick={handleReconnect}
+            disabled={isReconnecting}
+          >
+            <RefreshCw size={14} className={isReconnecting ? 'spinning' : ''} />
+            {isReconnecting ? '连接中...' : '重连'}
+          </button>
+        </div>
+      )}
 
       {/* 模型选择器 + 模式切换 */}
       <div className="chat-controls">
@@ -349,6 +381,21 @@ export default function ChatSidebar({
                 formatTime={formatTime}
               />
             ))}
+            {/* 处理中的加载状态 */}
+            {isProcessing && (
+              <div className="message assistant">
+                <div className="message-avatar processing">
+                  <Loader2 size={16} className="spinning" />
+                </div>
+                <div className="message-bubble assistant-bubble processing-bubble">
+                  <div className="processing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
         )}

@@ -1,11 +1,11 @@
 .scene-panel {
   position: fixed;
   top: 56px;
-  left: 0;
+  left: 380px; /* 位于 ChatSidebar 右侧 */
   bottom: 0;
-  width: 360px;
+  width: 320px;
   background: var(--bg-secondary);
-  z-index: 500;
+  z-index: 450;
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-lg);
@@ -169,6 +169,7 @@
 
 @media (max-width: 768px) {
   .scene-panel {
+    left: 0;
     width: 100%;
     max-width: 100%;
   }

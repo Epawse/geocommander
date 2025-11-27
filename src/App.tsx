@@ -9,8 +9,8 @@ import { MeasurePanel } from './components/MeasurePanel';
 import { SearchPanel } from './components/SearchPanel';
 import { StatusBar } from './components/StatusBar';
 import ChatSidebar from './components/ChatSidebar';
-import DebugPanel from './components/DebugPanel';  // @todo 生产环境删除
-import { debugLog } from './utils/debugUtils';      // @todo 生产环境删除
+import DebugPanel from './components/DebugPanel';
+import { debugLog } from './utils/debugUtils';
 import type { ChatMessage, ChatMode, SendMessageOptions } from './components/ChatSidebar';
 import { wsService } from './services/WebSocketService';
 import { actionDispatcher } from './dispatcher/ActionDispatcher';
@@ -40,7 +40,6 @@ function App() {
     wsService.setStatusChangeHandler((status) => {
       setWsConnected(status === 'connected');
       console.log('[App] MCP connection status:', status);
-      // @todo 生产环境删除
       debugLog('system', 'WebSocket 状态', status === 'connected' ? '✅ 已连接' : '❌ 断开连接');
     });
 
@@ -53,9 +52,9 @@ function App() {
         content: msg.content,
         timestamp: new Date(msg.timestamp),
         hasToolCall: msg.hasToolCall,
-        thinking: msg.thinking  // 传递思考过程到消息
+        thinking: msg.thinking
       }]);
-      // @todo 生产环境删除 - 显示 LLM 原始输出和思考过程
+      // 显示 LLM 原始输出和思考过程
       if (msg.thinking) {
         debugLog('llm', '🧠 LLM 思考过程', msg.thinking, {
           parsed_message: msg.content,
@@ -74,33 +73,30 @@ function App() {
     // 设置动作处理器
     wsService.setActionHandler(async (action) => {
       console.log('[App] Received action from server:', action);
-      // @todo 生产环境删除
-      debugLog('mcp', `MCP 工具调用: ${action.action}`, 
-        JSON.stringify(action.payload, null, 2), 
+      debugLog('mcp', `MCP 工具调用: ${action.action}`,
+        JSON.stringify(action.payload, null, 2),
         action
       );
-      
+
       // 检查 viewer 是否已初始化
       if (!actionDispatcher.hasViewer()) {
         console.warn('[App] Viewer not initialized yet, waiting...');
-        // 等待一小段时间让 viewer 初始化
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         if (!actionDispatcher.hasViewer()) {
           console.error('[App] Viewer still not initialized after waiting');
           return { id: action.id, success: false, error: 'Viewer not initialized yet, please try again' };
         }
       }
-      
+
       setIsProcessing(true);
       try {
         const response = await actionDispatcher.dispatch(action);
         console.log('[App] Action response:', response);
-        // @todo 生产环境删除
-        const resultMsg = response.result && typeof response.result === 'object' && 'message' in response.result 
-          ? (response.result as { message: string }).message 
+        const resultMsg = response.result && typeof response.result === 'object' && 'message' in response.result
+          ? (response.result as { message: string }).message
           : '成功';
-        debugLog('mcp', `MCP 执行结果: ${action.action}`, 
+        debugLog('mcp', `MCP 执行结果: ${action.action}`,
           response.success ? `✅ ${resultMsg}` : `❌ ${response.error || '失败'}`,
           response
         );
@@ -168,9 +164,8 @@ function App() {
       timestamp: new Date()
     };
     setChatMessages(prev => [...prev, userMessage]);
-    // @todo 生产环境删除
     debugLog('user', `用户输入 (${mode === 'command' ? '命令模式' : '对话模式'}${options?.thinking ? ' + 思考' : ''})`, command);
-    
+
     setIsProcessing(true);
     try {
       // 发送用户指令到 MCP Server，包含模式信息
@@ -218,16 +213,6 @@ function App() {
     setIsLayerPanelOpen(false);
   }, []);
 
-  const handleSlice = useCallback(() => {
-    // TODO: 实现剖面功能
-    console.log('Slice tool');
-  }, []);
-
-  const handleElevationProfile = useCallback(() => {
-    // TODO: 实现高程剖面功能
-    console.log('Elevation profile tool');
-  }, []);
-
   const handleLayerToggle = useCallback(() => {
     setIsLayerPanelOpen(prev => !prev);
     setIsMeasurePanelOpen(false);
@@ -248,8 +233,6 @@ function App() {
           <ToolPanel
             onMeasureDistance={handleMeasureDistance}
             onMeasureArea={handleMeasureArea}
-            onSlice={handleSlice}
-            onElevationProfile={handleElevationProfile}
             onLayerToggle={handleLayerToggle}
           />
 
@@ -281,7 +264,7 @@ function App() {
             llmModel={llmModel}
           />
 
-          {/* 对话侧边栏 - 替代底部输入框 */}
+          {/* 对话侧边栏 */}
           <ChatSidebar
             isOpen={isChatOpen}
             onToggle={() => setIsChatOpen(!isChatOpen)}
@@ -292,7 +275,7 @@ function App() {
             isConnected={wsConnected}
           />
 
-          {/* 调试面板 - 测试及演示专用 @todo 生产环境删除 */}
+          {/* 调试面板 - MCP 开发调试用 */}
           <DebugPanel />
         </main>
       </div>

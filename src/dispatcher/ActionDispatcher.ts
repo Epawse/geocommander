@@ -10,7 +10,7 @@ import type { MCPAction, MCPResponse } from '../services/WebSocketService';
 import { createTiandituImageryProvider } from '../config/mapConfig';
 
 // 支持的动作类型
-export type ActionType = 
+export type ActionType =
   | 'fly_to'
   | 'switch_basemap'
   | 'add_marker'
@@ -23,7 +23,10 @@ export type ActionType =
   | 'get_camera_position'
   | 'measure_distance'
   | 'draw_polygon'
-  | 'highlight_area';
+  | 'highlight_area'
+  | 'zoom_in'
+  | 'zoom_out'
+  | 'set_pitch';
 
 // 雨效果 Shader - 使用 Cesium GLSL ES 3.0 语法
 // Cesium 会自动提供: in vec2 v_textureCoordinates, uniform sampler2D colorTexture
@@ -263,6 +266,14 @@ export interface HighlightAreaParams {
   duration?: number;
 }
 
+export interface ZoomParams {
+  factor: number;
+}
+
+export interface SetPitchParams {
+  pitch: number;
+}
+
 /**
  * 动作分发器类
  */
@@ -374,7 +385,16 @@ export class ActionDispatcher {
       
       case 'highlight_area':
         return this.highlightArea(payload as unknown as HighlightAreaParams);
-      
+
+      case 'zoom_in':
+        return this.zoomIn(payload as unknown as ZoomParams);
+
+      case 'zoom_out':
+        return this.zoomOut(payload as unknown as ZoomParams);
+
+      case 'set_pitch':
+        return this.setPitch(payload as unknown as SetPitchParams);
+
       default:
         throw new Error(`Unknown action type: ${type}`);
     }
@@ -806,6 +826,87 @@ export class ActionDispatcher {
     }, duration * 1000);
 
     return { message: `Highlighted ${type} area for ${duration} seconds` };
+  }
+
+  /**
+   * 放大视图（减少相机高度）
+   */
+  private zoomIn(params: ZoomParams): { message: string } {
+    const { factor = 0.5 } = params;
+    const camera = this.viewer!.camera;
+    const position = camera.positionCartographic;
+
+    // 计算新高度
+    const newHeight = Math.max(100, position.height * factor);
+
+    camera.flyTo({
+      destination: Cesium.Cartesian3.fromRadians(
+        position.longitude,
+        position.latitude,
+        newHeight
+      ),
+      orientation: {
+        heading: camera.heading,
+        pitch: camera.pitch,
+        roll: camera.roll
+      },
+      duration: 0.5
+    });
+
+    return { message: `视图已放大，高度: ${Math.round(newHeight)}m` };
+  }
+
+  /**
+   * 缩小视图（增加相机高度）
+   */
+  private zoomOut(params: ZoomParams): { message: string } {
+    const { factor = 2.0 } = params;
+    const camera = this.viewer!.camera;
+    const position = camera.positionCartographic;
+
+    // 计算新高度（最大不超过 20000km）
+    const newHeight = Math.min(20000000, position.height * factor);
+
+    camera.flyTo({
+      destination: Cesium.Cartesian3.fromRadians(
+        position.longitude,
+        position.latitude,
+        newHeight
+      ),
+      orientation: {
+        heading: camera.heading,
+        pitch: camera.pitch,
+        roll: camera.roll
+      },
+      duration: 0.5
+    });
+
+    return { message: `视图已缩小，高度: ${Math.round(newHeight)}m` };
+  }
+
+  /**
+   * 设置相机俯仰角
+   */
+  private setPitch(params: SetPitchParams): { message: string } {
+    const { pitch = -45 } = params;
+    const camera = this.viewer!.camera;
+    const position = camera.positionCartographic;
+
+    camera.flyTo({
+      destination: Cesium.Cartesian3.fromRadians(
+        position.longitude,
+        position.latitude,
+        position.height
+      ),
+      orientation: {
+        heading: camera.heading,
+        pitch: Cesium.Math.toRadians(pitch),
+        roll: camera.roll
+      },
+      duration: 0.5
+    });
+
+    return { message: `俯仰角已设置为 ${pitch}°` };
   }
 
   /**

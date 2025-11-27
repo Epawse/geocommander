@@ -1,15 +1,12 @@
-import { 
-  Home, 
-  Plus, 
-  Minus, 
-  Navigation, 
-  Compass, 
+import {
+  Home,
+  Plus,
+  Minus,
+  Navigation,
+  Compass,
   Ruler,
   Square,
-  Scissors,
-  Mountain,
-  Layers,
-  Settings
+  Layers
 } from 'lucide-react';
 import { useCesium } from '../context/CesiumContext';
 import './ToolPanel.css';
@@ -17,16 +14,12 @@ import './ToolPanel.css';
 interface ToolPanelProps {
   onMeasureDistance: () => void;
   onMeasureArea: () => void;
-  onSlice: () => void;
-  onElevationProfile: () => void;
   onLayerToggle: () => void;
 }
 
-export function ToolPanel({ 
-  onMeasureDistance, 
+export function ToolPanel({
+  onMeasureDistance,
   onMeasureArea,
-  onSlice,
-  onElevationProfile,
   onLayerToggle
 }: ToolPanelProps) {
   const { resetView, zoomIn, zoomOut, viewerRef } = useCesium();
@@ -82,21 +75,12 @@ export function ToolPanel({
         <button className="tool-button" onClick={onMeasureArea} title="面积测量">
           <Square size={18} />
         </button>
-        <button className="tool-button" onClick={onSlice} title="剖面">
-          <Scissors size={18} />
-        </button>
-        <button className="tool-button" onClick={onElevationProfile} title="高程剖面">
-          <Mountain size={18} />
-        </button>
       </div>
 
-      {/* 图层和设置组 */}
+      {/* 图层组 */}
       <div className="tool-group">
         <button className="tool-button" onClick={onLayerToggle} title="图层">
           <Layers size={18} />
-        </button>
-        <button className="tool-button" title="设置">
-          <Settings size={18} />
         </button>
       </div>
     </div>
