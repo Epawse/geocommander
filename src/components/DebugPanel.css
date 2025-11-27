@@ -49,14 +49,14 @@
   top: 0;
   bottom: 0;
   width: 380px;
-  background: rgba(18, 18, 18, 0.98);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-secondary, rgba(18, 18, 18, 0.98));
+  border-left: 1px solid var(--border-primary, rgba(255, 255, 255, 0.1));
   display: flex;
   flex-direction: column;
   z-index: 1000;
   font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
   font-size: 12px;
-  color: #e0e0e0;
+  color: var(--text-primary, #e0e0e0);
 }
 
 /* 标题栏 */
@@ -494,36 +494,51 @@
   transform: none;
 }
 
-/* 快捷测试 */
+/* 快捷测试 - 分组 */
 .mcp-quick-tests {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  padding-top: 8px;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.quick-test-label {
-  font-size: 10px;
-  color: #666;
-  width: 100%;
-  margin-bottom: 2px;
+.quick-test-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.mcp-quick-tests button {
+.quick-test-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #888;
+}
+
+.quick-test-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quick-test-buttons button {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #ccc;
-  padding: 5px 10px;
-  border-radius: 4px;
+  padding: 5px 12px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 11px;
   transition: all 0.2s;
 }
 
-.mcp-quick-tests button:hover {
+.quick-test-buttons button:hover {
   background: rgba(255, 152, 0, 0.2);
   border-color: #FF9800;
   color: #FF9800;
+  transform: translateY(-1px);
+}
+
+.quick-test-buttons button:active {
+  transform: translateY(0);
 }

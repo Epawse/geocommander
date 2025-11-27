@@ -11,11 +11,12 @@
 .tool-group {
   display: flex;
   flex-direction: column;
-  background: rgba(38, 38, 38, 0.9);
+  background: var(--bg-secondary);
+  backdrop-filter: blur(12px);
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-primary);
 }
 
 .tool-button {
@@ -23,7 +24,7 @@
   height: 40px;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -41,16 +42,16 @@
 }
 
 .tool-button:hover {
-  background: rgba(96, 165, 250, 0.2);
-  color: #60a5fa;
+  background: var(--bg-active);
+  color: var(--color-primary);
 }
 
 .tool-button:active {
-  background: rgba(96, 165, 250, 0.3);
+  background: var(--bg-hover);
 }
 
 .tool-button + .tool-button {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--border-secondary);
 }
 
 /* Tooltip */
@@ -60,8 +61,8 @@
   right: 50px;
   top: 50%;
   transform: translateY(-50%);
-  background: rgba(0, 0, 0, 0.85);
-  color: white;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   padding: 6px 12px;
   border-radius: 4px;
   font-size: 12px;
@@ -70,6 +71,8 @@
   visibility: hidden;
   transition: all 0.2s;
   pointer-events: none;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-primary);
 }
 
 .tool-button::before {
@@ -79,7 +82,7 @@
   top: 50%;
   transform: translateY(-50%);
   border: 6px solid transparent;
-  border-left-color: rgba(0, 0, 0, 0.85);
+  border-left-color: var(--bg-primary);
   opacity: 0;
   visibility: hidden;
   transition: all 0.2s;
@@ -93,8 +96,8 @@
 
 /* Active state */
 .tool-button.active {
-  background: rgba(96, 165, 250, 0.3);
-  color: #60a5fa;
+  background: var(--bg-active);
+  color: var(--color-primary);
 }
 
 @media (max-width: 768px) {
@@ -103,12 +106,12 @@
     bottom: 20px;
     right: 10px;
   }
-  
+
   .tool-button {
     width: 36px;
     height: 36px;
   }
-  
+
   .tool-button::after,
   .tool-button::before {
     display: none;

@@ -11,24 +11,22 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { 
-  MessageSquare, 
-  ChevronLeft, 
-  Trash2, 
-  Send, 
+import {
+  MessageSquare,
+  ChevronLeft,
+  ChevronDown,
+  ChevronRight,
+  Trash2,
+  Send,
   Loader2,
-  MapPin,
   Bot,
-  User,
   Sparkles,
   Terminal,
   MessageCircle,
-  Sun,
-  Moon,
-  Monitor
+  Brain,
+  Wrench
 } from 'lucide-react';
 import ModelSelector from './ModelSelector';
-import { useTheme, type ThemeMode } from '../hooks/useTheme';
 import './ChatSidebar.css';
 
 // 消息类型
@@ -39,6 +37,7 @@ export interface ChatMessage {
   timestamp: Date;
   hasToolCall?: boolean;
   isStreaming?: boolean;
+  thinking?: string;  // LLM 思考过程
 }
 
 // 对话模式
@@ -57,53 +56,6 @@ interface ChatSidebarProps {
   onClearMessages: () => void;
   isProcessing: boolean;
   isConnected: boolean;
-}
-
-// 主题切换组件
-function ThemeSwitcher() {
-  const { mode, setTheme } = useTheme();
-  const [isOpen, setIsOpen] = useState(false);
-
-  const themes: { mode: ThemeMode; icon: typeof Sun; label: string }[] = [
-    { mode: 'light', icon: Sun, label: '浅色' },
-    { mode: 'dark', icon: Moon, label: '深色' },
-    { mode: 'system', icon: Monitor, label: '跟随系统' },
-  ];
-
-  const currentTheme = themes.find(t => t.mode === mode) || themes[2];
-  const CurrentIcon = currentTheme.icon;
-
-  return (
-    <div className="theme-switcher">
-      <button 
-        className="theme-toggle-btn"
-        onClick={() => setIsOpen(!isOpen)}
-        title={`当前: ${currentTheme.label}`}
-      >
-        <CurrentIcon size={16} />
-      </button>
-      {isOpen && (
-        <>
-          <div className="theme-dropdown-overlay" onClick={() => setIsOpen(false)} />
-          <div className="theme-dropdown">
-            {themes.map(({ mode: themeMode, icon: Icon, label }) => (
-              <button
-                key={themeMode}
-                className={`theme-option ${mode === themeMode ? 'active' : ''}`}
-                onClick={() => {
-                  setTheme(themeMode);
-                  setIsOpen(false);
-                }}
-              >
-                <Icon size={14} />
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
 }
 
 // 模式切换组件
@@ -134,14 +86,99 @@ function ModeSwitcher({ mode, onChange }: { mode: ChatMode; onChange: (mode: Cha
 function ThinkingToggle({ enabled, onChange }: { enabled: boolean; onChange: (enabled: boolean) => void }) {
   return (
     <label className="thinking-toggle" title="启用后，LLM 会输出详细的思考过程">
-      <input 
-        type="checkbox" 
-        checked={enabled} 
+      <input
+        type="checkbox"
+        checked={enabled}
         onChange={(e) => onChange(e.target.checked)}
       />
       <Sparkles size={14} className={enabled ? 'thinking-active' : ''} />
       <span>思考</span>
     </label>
+  );
+}
+
+// 消息气泡组件
+function MessageBubble({
+  message,
+  formatTime
+}: {
+  message: ChatMessage;
+  formatTime: (date: Date) => string;
+}) {
+  const [thinkingExpanded, setThinkingExpanded] = useState(false);
+
+  // 用户消息
+  if (message.role === 'user') {
+    return (
+      <div className="message user">
+        <div className="message-bubble user-bubble">
+          <div className="message-content">{message.content}</div>
+          <div className="message-time">{formatTime(message.timestamp)}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // 思考中状态
+  if (message.role === 'thinking') {
+    return (
+      <div className="message assistant">
+        <div className="message-avatar">
+          <Loader2 size={16} className="spinning" />
+        </div>
+        <div className="message-bubble assistant-bubble">
+          <div className="message-content thinking-text">
+            <Brain size={14} />
+            <span>正在思考...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // AI 消息
+  return (
+    <div className="message assistant">
+      <div className="message-avatar">
+        <Bot size={16} />
+      </div>
+      <div className="message-bubble assistant-bubble">
+        {/* 思考过程（可折叠） */}
+        {message.thinking && (
+          <div className="thinking-section">
+            <button
+              className="thinking-header"
+              onClick={() => setThinkingExpanded(!thinkingExpanded)}
+            >
+              <Brain size={12} />
+              <span>思考过程</span>
+              {thinkingExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </button>
+            {thinkingExpanded && (
+              <div className="thinking-content">
+                {message.thinking}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 消息内容 */}
+        <div className="message-content">
+          {message.content}
+          {message.isStreaming && <span className="cursor" />}
+        </div>
+
+        {/* 工具调用标记 */}
+        {message.hasToolCall && (
+          <div className="tool-call-badge">
+            <Wrench size={12} />
+            <span>已执行地图操作</span>
+          </div>
+        )}
+
+        <div className="message-time">{formatTime(message.timestamp)}</div>
+      </div>
+    </div>
   );
 }
 
@@ -215,9 +252,8 @@ export default function ChatSidebar({
           <span className="header-title">GeoCommander</span>
         </div>
         <div className="header-actions">
-          <ThemeSwitcher />
-          <button 
-            className="header-btn" 
+          <button
+            className="header-btn"
             onClick={onClearMessages}
             title="清除对话"
             disabled={messages.length === 0}
@@ -307,36 +343,11 @@ export default function ChatSidebar({
         ) : (
           <div className="chat-messages">
             {messages.map((msg) => (
-              <div key={msg.id} className={`message ${msg.role}`}>
-                <div className="message-avatar">
-                  {msg.role === 'user' ? (
-                    <User size={16} />
-                  ) : msg.role === 'thinking' ? (
-                    <Loader2 size={16} className="spinning" />
-                  ) : (
-                    <Bot size={16} />
-                  )}
-                </div>
-                <div className="message-body">
-                  <div className="message-content">
-                    {msg.role === 'thinking' ? (
-                      <span className="thinking-text">正在思考...</span>
-                    ) : (
-                      <>
-                        {msg.content}
-                        {msg.hasToolCall && (
-                          <span className="tool-badge" title="已执行地图操作">
-                            <MapPin size={12} />
-                            地图操作
-                          </span>
-                        )}
-                      </>
-                    )}
-                    {msg.isStreaming && <span className="cursor" />}
-                  </div>
-                  <div className="message-time">{formatTime(msg.timestamp)}</div>
-                </div>
-              </div>
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                formatTime={formatTime}
+              />
             ))}
             <div ref={messagesEndRef} />
           </div>

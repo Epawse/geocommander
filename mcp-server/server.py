@@ -1206,6 +1206,23 @@ async def mcp_call_tool(request: MCPToolCallRequest):
     return result
 
 
+@app.get("/model")
+async def get_current_model():
+    """获取当前使用的 LLM 模型"""
+    try:
+        from llm_providers import provider_manager
+        provider = provider_manager.get_active()
+        if provider:
+            return {
+                "model": provider.model,
+                "provider": provider.name,
+                "type": provider.type.value
+            }
+        return {"model": None, "provider": None}
+    except Exception as e:
+        return {"model": None, "error": str(e)}
+
+
 @app.get("/providers")
 async def get_providers():
     """获取所有 LLM 服务商"""

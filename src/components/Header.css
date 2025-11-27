@@ -1,16 +1,22 @@
+/* Header - 现代化顶部导航栏 */
+
 .header {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   height: 56px;
-  background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%);
+  background: var(--bg-secondary);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
   z-index: 1000;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-sm);
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .header-left {
@@ -20,162 +26,313 @@
 }
 
 .menu-button {
-  background: transparent;
-  border: none;
-  color: white;
+  width: 36px;
+  height: 36px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
   cursor: pointer;
-  padding: 8px;
-  border-radius: 4px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
 }
 
 .menu-button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-active);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  transform: scale(1.02);
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .logo-icon {
-  color: #60a5fa;
+  color: var(--color-primary);
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.4));
 }
 
 .logo-text {
-  color: white;
+  color: var(--text-primary);
   font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  background: linear-gradient(135deg, var(--color-primary), #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
+/* 导航菜单 */
 .header-nav {
   display: flex;
   align-items: center;
   gap: 4px;
+  background: var(--bg-tertiary);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border-secondary);
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary);
   text-decoration: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: all 0.2s;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .nav-item.active {
-  background: rgba(96, 165, 250, 0.2);
-  color: #60a5fa;
+  background: var(--color-primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
+.nav-item svg {
+  width: 15px;
+  height: 15px;
+  opacity: 0.8;
+}
+
+.nav-item.active svg {
+  opacity: 1;
+}
+
+/* 右侧区域 */
 .header-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
+/* 搜索框 */
 .search-box {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.2s;
+  border: 1px solid var(--border-primary);
+  transition: all 0.2s ease;
 }
 
 .search-box:focus-within {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: #60a5fa;
+  background: var(--bg-input-focus);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
 .search-box input {
   background: transparent;
   border: none;
-  color: white;
-  padding: 8px 16px;
+  color: var(--text-primary);
+  padding: 9px 14px;
   width: 200px;
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
 }
 
 .search-box input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
 }
 
 .search-button {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
   cursor: pointer;
   padding: 8px 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.2s;
+  transition: color 0.2s ease;
 }
 
 .search-button:hover {
-  color: white;
+  color: var(--color-primary);
 }
 
+/* 图标按钮 */
 .icon-button {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.8);
+  width: 36px;
+  height: 36px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
   cursor: pointer;
-  padding: 8px;
-  border-radius: 4px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
 .icon-button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-active);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* 用户按钮 */
+.user-button {
+  width: auto;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
   color: white;
 }
 
-.user-button {
-  padding: 8px 16px;
-  font-size: 14px;
+.user-button:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
+/* 响应式 */
 @media (max-width: 1024px) {
   .header-nav {
     display: none;
   }
-  
+
   .search-box input {
     width: 150px;
   }
 }
 
 @media (max-width: 768px) {
+  .header {
+    padding: 0 12px;
+  }
+
   .logo-text {
     display: none;
   }
-  
+
   .search-box {
     display: none;
   }
-  
+
   .user-button span {
     display: none;
   }
+
+  .user-button {
+    width: 36px;
+    padding: 8px;
+  }
+}
+
+/* 浅色主题特定调整 */
+[data-theme="light"] .logo-text {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+[data-theme="light"] .nav-item.active {
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="light"] .user-button:hover {
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+/* 主题切换器 */
+.theme-switcher {
+  position: relative;
+}
+
+.theme-toggle-btn {
+  background: var(--bg-hover) !important;
+}
+
+.theme-dropdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+.theme-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  padding: 6px;
+  min-width: 130px;
+  z-index: 1000;
+  box-shadow: var(--shadow-lg);
+  animation: dropdownFadeIn 0.15s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.theme-option:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.theme-option.active {
+  background: var(--bg-active);
+  color: var(--color-primary);
+}
+
+.theme-option svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }

@@ -14,9 +14,13 @@ import { debugLog } from './utils/debugUtils';      // @todo 生产环境删除
 import type { ChatMessage, ChatMode, SendMessageOptions } from './components/ChatSidebar';
 import { wsService } from './services/WebSocketService';
 import { actionDispatcher } from './dispatcher/ActionDispatcher';
+import { useTheme } from './hooks/useTheme';
 import './App.css';
 
 function App() {
+  // 初始化主题（确保在 App 级别应用主题）
+  useTheme();
+
   const [isScenePanelOpen, setIsScenePanelOpen] = useState(false);
   const [isLayerPanelOpen, setIsLayerPanelOpen] = useState(false);
   const [isMeasurePanelOpen, setIsMeasurePanelOpen] = useState(false);
@@ -27,6 +31,8 @@ function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(true);  // 默认展开对话侧栏
+  const [mcpToolsCount, setMcpToolsCount] = useState(0);
+  const [llmModel, setLlmModel] = useState<string | undefined>(undefined);
 
   // 初始化 WebSocket 连接
   useEffect(() => {
@@ -46,21 +52,22 @@ function App() {
         role: 'assistant',
         content: msg.content,
         timestamp: new Date(msg.timestamp),
-        hasToolCall: msg.hasToolCall
+        hasToolCall: msg.hasToolCall,
+        thinking: msg.thinking  // 传递思考过程到消息
       }]);
       // @todo 生产环境删除 - 显示 LLM 原始输出和思考过程
       if (msg.thinking) {
-        debugLog('llm', '🧠 LLM 思考过程', msg.thinking, { 
+        debugLog('llm', '🧠 LLM 思考过程', msg.thinking, {
           parsed_message: msg.content,
           has_tool_call: msg.hasToolCall,
           thinking: msg.thinking,
-          raw_json: msg.llmRaw 
+          raw_json: msg.llmRaw
         });
       }
-      debugLog('llm', 'LLM 原始输出', msg.llmRaw || msg.content, { 
+      debugLog('llm', 'LLM 原始输出', msg.llmRaw || msg.content, {
         parsed_message: msg.content,
         has_tool_call: msg.hasToolCall,
-        raw_json: msg.llmRaw 
+        raw_json: msg.llmRaw
       });
     });
 
@@ -115,6 +122,41 @@ function App() {
       // wsService.disconnect();
     };
   }, []);
+
+  // 获取 MCP 状态（工具数量和 LLM 模型）
+  useEffect(() => {
+    if (!wsConnected) {
+      setMcpToolsCount(0);
+      setLlmModel(undefined);
+      return;
+    }
+
+    const fetchMcpStatus = async () => {
+      try {
+        const [statusRes, modelRes] = await Promise.all([
+          fetch('http://localhost:8765/mcp/status'),
+          fetch('http://localhost:8765/model')
+        ]);
+
+        if (statusRes.ok) {
+          const status = await statusRes.json();
+          setMcpToolsCount(status.tools_count || 0);
+        }
+
+        if (modelRes.ok) {
+          const modelData = await modelRes.json();
+          setLlmModel(modelData.model || undefined);
+        }
+      } catch (e) {
+        console.warn('[App] Failed to fetch MCP status:', e);
+      }
+    };
+
+    fetchMcpStatus();
+    // 每 30 秒刷新一次状态
+    const interval = setInterval(fetchMcpStatus, 30000);
+    return () => clearInterval(interval);
+  }, [wsConnected]);
 
   // 发送自然语言指令到 MCP Server
   const handleSendCommand = useCallback(async (command: string, mode: ChatMode, options?: SendMessageOptions) => {
@@ -233,7 +275,11 @@ function App() {
             initialQuery={searchQuery}
           />
 
-          <StatusBar wsConnected={wsConnected} />
+          <StatusBar
+            wsConnected={wsConnected}
+            mcpToolsCount={mcpToolsCount}
+            llmModel={llmModel}
+          />
 
           {/* 对话侧边栏 - 替代底部输入框 */}
           <ChatSidebar

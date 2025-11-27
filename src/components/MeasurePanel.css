@@ -3,12 +3,12 @@
   top: 80px;
   right: 70px;
   width: 300px;
-  background: rgba(26, 26, 26, 0.95);
+  background: var(--bg-secondary);
   border-radius: 12px;
   z-index: 400;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-primary);
   animation: fadeIn 0.2s ease;
 }
 
@@ -28,11 +28,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .measure-panel-header h2 {
-  color: white;
+  color: var(--text-primary);
   font-size: 15px;
   font-weight: 600;
   margin: 0;
@@ -41,7 +41,7 @@
 .measure-panel .close-button {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
@@ -52,8 +52,8 @@
 }
 
 .measure-panel .close-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .measure-panel-content {
@@ -65,15 +65,15 @@
 }
 
 .measure-instructions p {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   font-size: 13px;
   margin: 0;
   line-height: 1.5;
 }
 
 .measure-result {
-  background: rgba(96, 165, 250, 0.1);
-  border: 1px solid rgba(96, 165, 250, 0.3);
+  background: var(--bg-active);
+  border: 1px solid var(--color-primary);
   border-radius: 8px;
   padding: 12px 16px;
   margin-bottom: 16px;
@@ -83,12 +83,12 @@
 }
 
 .result-label {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
 .result-value {
-  color: #60a5fa;
+  color: var(--color-primary);
   font-size: 16px;
   font-weight: 600;
 }
@@ -101,7 +101,7 @@
 .measure-button {
   flex: 1;
   padding: 10px 16px;
-  background: #60a5fa;
+  background: var(--color-primary);
   border: none;
   border-radius: 6px;
   color: white;
@@ -112,7 +112,7 @@
 }
 
 .measure-button:hover:not(:disabled) {
-  background: #3b82f6;
+  background: var(--color-primary-hover);
 }
 
 .measure-button:disabled {
@@ -121,16 +121,16 @@
 }
 
 .measure-button.active {
-  background: #22c55e;
+  background: var(--color-success);
 }
 
 .measure-button.secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .measure-button.secondary:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--bg-active);
 }
 
 @media (max-width: 768px) {

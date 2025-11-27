@@ -392,25 +392,93 @@ export default function DebugPanel() {
             </button>
           </div>
 
-          {/* 快捷测试按钮 */}
+          {/* 快捷测试按钮 - 分组 */}
           <div className="mcp-quick-tests">
-            <span className="quick-test-label">快捷测试:</span>
-            <button onClick={() => {
-              setSelectedTool('fly_to_location');
-              setToolArgs('{"name": "北京"}');
-            }}>飞往北京</button>
-            <button onClick={() => {
-              setSelectedTool('set_weather');
-              setToolArgs('{"weather_type": "rain", "intensity": 0.5}');
-            }}>下雨</button>
-            <button onClick={() => {
-              setSelectedTool('set_time');
-              setToolArgs('{"preset": "night"}');
-            }}>夜晚</button>
-            <button onClick={() => {
-              setSelectedTool('switch_basemap');
-              setToolArgs('{"basemap_type": "satellite"}');
-            }}>卫星图</button>
+            <div className="quick-test-group">
+              <span className="quick-test-label">📍 导航</span>
+              <div className="quick-test-buttons">
+                <button onClick={() => {
+                  setSelectedTool('fly_to_location');
+                  setToolArgs('{"name": "北京"}');
+                  callMcpTool();
+                }}>北京</button>
+                <button onClick={() => {
+                  setSelectedTool('fly_to_location');
+                  setToolArgs('{"name": "上海"}');
+                  callMcpTool();
+                }}>上海</button>
+                <button onClick={() => {
+                  setSelectedTool('fly_to_location');
+                  setToolArgs('{"name": "东京"}');
+                  callMcpTool();
+                }}>东京</button>
+                <button onClick={() => {
+                  setSelectedTool('reset_view');
+                  setToolArgs('{}');
+                  callMcpTool();
+                }}>重置</button>
+              </div>
+            </div>
+            <div className="quick-test-group">
+              <span className="quick-test-label">🌤️ 天气</span>
+              <div className="quick-test-buttons">
+                <button onClick={() => {
+                  setSelectedTool('set_weather');
+                  setToolArgs('{"weather_type": "rain", "intensity": 0.6}');
+                  callMcpTool();
+                }}>下雨</button>
+                <button onClick={() => {
+                  setSelectedTool('set_weather');
+                  setToolArgs('{"weather_type": "snow", "intensity": 0.6}');
+                  callMcpTool();
+                }}>下雪</button>
+                <button onClick={() => {
+                  setSelectedTool('clear_weather');
+                  setToolArgs('{}');
+                  callMcpTool();
+                }}>晴天</button>
+              </div>
+            </div>
+            <div className="quick-test-group">
+              <span className="quick-test-label">🕐 时间</span>
+              <div className="quick-test-buttons">
+                <button onClick={() => {
+                  setSelectedTool('set_time');
+                  setToolArgs('{"preset": "day"}');
+                  callMcpTool();
+                }}>白天</button>
+                <button onClick={() => {
+                  setSelectedTool('set_time');
+                  setToolArgs('{"preset": "night"}');
+                  callMcpTool();
+                }}>夜晚</button>
+                <button onClick={() => {
+                  setSelectedTool('set_time');
+                  setToolArgs('{"preset": "dusk"}');
+                  callMcpTool();
+                }}>黄昏</button>
+              </div>
+            </div>
+            <div className="quick-test-group">
+              <span className="quick-test-label">🗺️ 底图</span>
+              <div className="quick-test-buttons">
+                <button onClick={() => {
+                  setSelectedTool('switch_basemap');
+                  setToolArgs('{"basemap_type": "satellite"}');
+                  callMcpTool();
+                }}>卫星</button>
+                <button onClick={() => {
+                  setSelectedTool('switch_basemap');
+                  setToolArgs('{"basemap_type": "vector"}');
+                  callMcpTool();
+                }}>矢量</button>
+                <button onClick={() => {
+                  setSelectedTool('switch_basemap');
+                  setToolArgs('{"basemap_type": "terrain"}');
+                  callMcpTool();
+                }}>地形</button>
+              </div>
+            </div>
           </div>
         </div>
       )}

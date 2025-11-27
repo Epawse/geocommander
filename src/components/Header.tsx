@@ -1,20 +1,71 @@
 import { useState } from 'react';
-import { 
-  Home, 
-  Search, 
-  Menu, 
-  User, 
+import {
+  Home,
+  Search,
+  Menu,
+  User,
   HelpCircle,
   MapIcon,
   Layers,
-  Box
+  Box,
+  Sun,
+  Moon,
+  Monitor
 } from 'lucide-react';
+import { useTheme, type ThemeMode } from '../hooks/useTheme';
 import './Header.css';
 
 interface HeaderProps {
   onMenuClick: () => void;
   onSearchChange: (value: string) => void;
   onSearch: () => void;
+}
+
+// 主题切换组件
+function ThemeSwitcher() {
+  const { mode, setTheme } = useTheme();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const themes: { mode: ThemeMode; icon: typeof Sun; label: string }[] = [
+    { mode: 'light', icon: Sun, label: '浅色' },
+    { mode: 'dark', icon: Moon, label: '深色' },
+    { mode: 'system', icon: Monitor, label: '跟随系统' },
+  ];
+
+  const currentTheme = themes.find(t => t.mode === mode) || themes[2];
+  const CurrentIcon = currentTheme.icon;
+
+  return (
+    <div className="theme-switcher">
+      <button
+        className="icon-button theme-toggle-btn"
+        onClick={() => setIsOpen(!isOpen)}
+        title={`当前主题: ${currentTheme.label}`}
+      >
+        <CurrentIcon size={18} />
+      </button>
+      {isOpen && (
+        <>
+          <div className="theme-dropdown-overlay" onClick={() => setIsOpen(false)} />
+          <div className="theme-dropdown">
+            {themes.map(({ mode: themeMode, icon: Icon, label }) => (
+              <button
+                key={themeMode}
+                className={`theme-option ${mode === themeMode ? 'active' : ''}`}
+                onClick={() => {
+                  setTheme(themeMode);
+                  setIsOpen(false);
+                }}
+              >
+                <Icon size={16} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function Header({ onMenuClick, onSearchChange, onSearch }: HeaderProps) {
@@ -76,6 +127,7 @@ export function Header({ onMenuClick, onSearchChange, onSearch }: HeaderProps) {
             <Search size={18} />
           </button>
         </div>
+        <ThemeSwitcher />
         <button className="icon-button">
           <HelpCircle size={20} />
         </button>

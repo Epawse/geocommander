@@ -1,110 +1,111 @@
 # GeoCommander
 
-**自然语言驱动的三维地理空间控制系统**
+**Natural Language Driven 3D Geospatial Control System**
 
-> 一个创新的 WebGIS 应用，让用户通过自然语言控制 3D 地球可视化
+> An innovative WebGIS application that allows users to control 3D globe visualization through natural language
 
-> **[开发中]** 本项目正在积极开发，功能可能会有变化
+> **[In Development]** This project is actively under development, features may change
 
 ![React](https://img.shields.io/badge/React-19-61dafb)
 ![Cesium](https://img.shields.io/badge/Cesium-1.124-green)
 ![Python](https://img.shields.io/badge/Python-3.11+-yellow)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
-## 特性
+## Features
 
-- **自然语言控制** - 用中文指令控制 3D 地球，如"飞到上海外滩"
-- **3D 地球可视化** - 基于 Cesium 的高性能三维地球渲染
-- **LLM 工具调用** - 借鉴 MCP 协议思想的工具调用机制
-- **天气效果** - 雨、雪、雾等粒子系统天气模拟
-- **昼夜切换** - 白天/夜晚/黎明/黄昏时间控制
-- **POI 标注** - 动态添加/删除地图标记点
-- **多源底图** - 天地图卫星、矢量、地形、深色图层
-- **多 LLM 支持** - Vertex AI (Gemini)、OpenAI、Ollama 等
+- **Natural Language Control** - Control 3D globe with Chinese commands like "飞到上海外滩" (fly to Shanghai Bund)
+- **3D Globe Visualization** - High-performance 3D globe rendering based on Cesium
+- **LLM Tool Calling** - Tool calling mechanism inspired by MCP protocol
+- **Weather Effects** - Rain, snow, fog particle system weather simulation
+- **Day/Night Cycle** - Day/night/dawn/dusk time control
+- **POI Markers** - Dynamic add/remove map markers
+- **Multiple Basemaps** - Tianditu satellite, vector, terrain, dark layers
+- **Multi-LLM Support** - Vertex AI (Gemini), OpenAI, Ollama, etc.
 
-## 架构
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        用户界面 (React)                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
-│  │  ChatSidebar│  │  StatusBar  │  │    CesiumViewer          │ │
-│  │ (自然语言)   │  │  (连接状态) │  │    (3D渲染)             │ │
-│  └──────┬──────┘  └─────────────┘  └────────────▲────────────┘ │
-│         │                                        │              │
-│         │                              ┌─────────┴─────────┐    │
-│         │                              │  ActionDispatcher │    │
-│         │                              │  (JSON→Cesium)    │    │
-│         │                              └─────────▲─────────┘    │
-└─────────┼────────────────────────────────────────┼──────────────┘
+│                      User Interface (React)                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │ ChatSidebar │  │  StatusBar  │  │    CesiumViewer         │  │
+│  │ (NL Input)  │  │  (Status)   │  │    (3D Render)          │  │
+│  └──────┬──────┘  └─────────────┘  └────────────▲────────────┘  │
+│         │                                        │               │
+│         │                              ┌─────────┴─────────┐     │
+│         │                              │  ActionDispatcher │     │
+│         │                              │  (JSON→Cesium)    │     │
+│         │                              └─────────▲─────────┘     │
+└─────────┼────────────────────────────────────────┼───────────────┘
           │ WebSocket                              │ Actions
           │                                        │
-┌─────────▼────────────────────────────────────────┴──────────────┐
-│                     后端服务 (Python FastAPI)                    │
-│  ┌───────────────┐  ┌─────────────┐  ┌────────────────────────┐ │
-│  │  LLM 集成     │  │  工具定义   │  │  地点知识库            │ │
-│  │ (多服务商)    │  │  (fly_to等) │  │  (城市/地标)           │ │
-│  └───────────────┘  └─────────────┘  └────────────────────────┘ │
+┌─────────▼────────────────────────────────────────┴───────────────┐
+│                    Backend Service (Python FastAPI)               │
+│  ┌───────────────┐  ┌─────────────┐  ┌────────────────────────┐  │
+│  │ LLM Integration│  │ Tool Defs   │  │  Location Knowledge    │  │
+│  │ (Multi-vendor) │  │ (fly_to,etc)│  │  (Cities/Landmarks)    │  │
+│  └───────────────┘  └─────────────┘  └────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-## 支持的工具
+## Supported Tools
 
-| 工具 | 描述 | 示例指令 |
-|------|------|---------|
-| `fly_to` | 飞行到指定位置 | "飞到北京天安门" |
-| `switch_basemap` | 切换底图 | "切换到卫星影像" |
-| `add_marker` | 添加标记点 | "在上海外滩添加红色标记" |
-| `set_weather` | 设置天气 | "显示下雨效果" |
-| `set_time` | 设置时间 | "切换到夜晚" |
-| `clear_markers` | 清除标记 | "清除所有标记" |
-| `clear_weather` | 清除天气 | "清除天气效果" |
+| Tool | Description | Example Command |
+|------|-------------|-----------------|
+| `fly_to` | Fly to specified location | "飞到北京天安门" |
+| `switch_basemap` | Switch basemap | "切换到卫星影像" |
+| `add_marker` | Add marker point | "在上海外滩添加红色标记" |
+| `set_weather` | Set weather effect | "显示下雨效果" |
+| `set_time` | Set time of day | "切换到夜晚" |
+| `clear_markers` | Clear all markers | "清除所有标记" |
+| `clear_weather` | Clear weather effects | "清除天气效果" |
+| `reset_view` | Reset camera view | "重置视角" |
 
-## 快速开始
+## Quick Start
 
-### 前端
+### Frontend
 
 ```bash
-# 安装依赖
+# Install dependencies
 npm install
 
-# 启动开发服务器
+# Start development server
 npm run dev
 ```
 
-### 后端
+### Backend
 
 ```bash
 cd mcp-server
 
-# 创建虚拟环境
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate  # Linux/macOS
 
-# 安装依赖
+# Install dependencies
 pip install -r requirements.txt
 
-# 配置环境变量
+# Configure environment variables
 cp .env.example .env
-# 编辑 .env 配置 LLM API
+# Edit .env to configure LLM API
 
-# 启动服务
+# Start server
 python server.py
 ```
 
-### 访问应用
+### Access Application
 
-- 前端: http://localhost:5173
-- 后端: ws://localhost:8765
+- Frontend: http://localhost:5173
+- Backend: ws://localhost:8765
 
-## 项目结构
+## Project Structure
 
 ```
 geocommander/
 ├── src/
-│   ├── components/           # React 组件
-│   │   ├── CesiumViewer.tsx  # 3D 地球
-│   │   ├── ChatSidebar.tsx   # 聊天界面
+│   ├── components/           # React components
+│   │   ├── CesiumViewer.tsx  # 3D Globe
+│   │   ├── ChatSidebar.tsx   # Chat interface
 │   │   └── ...
 │   ├── services/
 │   │   └── WebSocketService.ts
@@ -113,14 +114,14 @@ geocommander/
 │   └── config/
 │       └── mapConfig.ts
 ├── mcp-server/
-│   ├── server.py             # 后端主程序
-│   ├── llm_providers.py      # LLM 服务商管理
+│   ├── server.py             # Backend main program
+│   ├── llm_providers.py      # LLM provider management
 │   ├── requirements.txt
 │   └── .env.example
 └── package.json
 ```
 
-## 示例指令
+## Example Commands
 
 ```
 飞到北京天安门
@@ -131,23 +132,23 @@ geocommander/
 重置视角
 ```
 
-## LLM 配置
+## LLM Configuration
 
-支持多种 LLM 服务商，在 `.env` 中配置：
+Multiple LLM providers are supported, configure in `.env`:
 
 ```env
 USE_LLM=true
 
-# Google Vertex AI (Gemini) - 推荐
+# Google Vertex AI (Gemini) - Recommended
 VERTEX_PROJECT_ID=your-project-id
 VERTEX_CLIENT_EMAIL=your-service-account@...
 VERTEX_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----...
 VERTEX_MODEL=gemini-2.5-flash-lite
 
-# 或 OpenAI
+# Or OpenAI
 # OPENAI_API_KEY=sk-...
 
-# 或本地 Ollama
+# Or local Ollama
 # OLLAMA_BASE_URL=http://localhost:11434/v1
 # OLLAMA_MODEL=qwen2.5:7b
 ```
@@ -158,6 +159,6 @@ MIT
 
 ---
 
-## 相关项目
+## Related Projects
 
-- [mcp-geo-tools](https://github.com/epawse/mcp-geo-tools) - 标准 MCP Server 实现（规划中）
+- [mcp-geo-tools](https://github.com/epawse/mcp-geo-tools) - Standard MCP Server implementation (planned)
