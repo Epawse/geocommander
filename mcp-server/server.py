@@ -490,9 +490,12 @@ class ChatAssistant:
         """
         # 根据模式和思考开关选择不同的 system prompt
         if mode == 'command':
-            system_prompt = self.COMMAND_PROMPT_THINKING if thinking else self.COMMAND_PROMPT
+            base_prompt = self.COMMAND_PROMPT_THINKING if thinking else self.COMMAND_PROMPT
         else:
-            system_prompt = self.CONVERSATION_PROMPT
+            base_prompt = self.CONVERSATION_PROMPT
+
+        # 动态注入 MCP 工具列表
+        system_prompt = self._build_dynamic_prompt(base_prompt)
 
         # 必须使用 LLM
         if self.use_llm and self.llm_client:
