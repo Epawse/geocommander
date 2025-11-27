@@ -10,10 +10,13 @@ import { SearchPanel } from './components/SearchPanel';
 import { StatusBar } from './components/StatusBar';
 import ChatSidebar from './components/ChatSidebar';
 import DebugPanel from './components/DebugPanel';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ToastProvider } from './components/Toast';
 import { debugLog } from './utils/debugUtils';
 import type { ChatMessage, ChatMode, SendMessageOptions } from './components/ChatSidebar';
 import { wsService } from './services/WebSocketService';
 import { actionDispatcher } from './dispatcher/ActionDispatcher';
+import { API_URL } from './config/mapConfig';
 import { useTheme } from './hooks/useTheme';
 import './App.css';
 
@@ -130,8 +133,8 @@ function App() {
     const fetchMcpStatus = async () => {
       try {
         const [statusRes, modelRes] = await Promise.all([
-          fetch('http://localhost:8765/mcp/status'),
-          fetch('http://localhost:8765/model')
+          fetch(`${API_URL}/mcp/status`),
+          fetch(`${API_URL}/model`)
         ]);
 
         if (statusRes.ok) {
@@ -219,67 +222,71 @@ function App() {
   }, []);
 
   return (
-    <CesiumProvider>
-      <div className="app">
-        <Header 
-          onMenuClick={handleMenuClick}
-          onSearchChange={handleSearchChange}
-          onSearch={handleSearch}
-        />
-        
-        <main className="main-content">
-          <CesiumViewer />
-          
-          <ToolPanel
-            onMeasureDistance={handleMeasureDistance}
-            onMeasureArea={handleMeasureArea}
-            onLayerToggle={handleLayerToggle}
-          />
+    <ErrorBoundary>
+      <ToastProvider>
+        <CesiumProvider>
+          <div className="app">
+            <Header
+              onMenuClick={handleMenuClick}
+              onSearchChange={handleSearchChange}
+              onSearch={handleSearch}
+            />
 
-          <ScenePanel
-            isOpen={isScenePanelOpen}
-            onClose={() => setIsScenePanelOpen(false)}
-          />
+            <main className="main-content">
+              <CesiumViewer />
 
-          <LayerPanel
-            isOpen={isLayerPanelOpen}
-            onClose={() => setIsLayerPanelOpen(false)}
-          />
+              <ToolPanel
+                onMeasureDistance={handleMeasureDistance}
+                onMeasureArea={handleMeasureArea}
+                onLayerToggle={handleLayerToggle}
+              />
 
-          <MeasurePanel
-            isOpen={isMeasurePanelOpen}
-            onClose={() => setIsMeasurePanelOpen(false)}
-            type={measureType}
-          />
+              <ScenePanel
+                isOpen={isScenePanelOpen}
+                onClose={() => setIsScenePanelOpen(false)}
+              />
 
-          <SearchPanel
-            isOpen={isSearchPanelOpen}
-            onClose={() => setIsSearchPanelOpen(false)}
-            initialQuery={searchQuery}
-          />
+              <LayerPanel
+                isOpen={isLayerPanelOpen}
+                onClose={() => setIsLayerPanelOpen(false)}
+              />
 
-          <StatusBar
-            wsConnected={wsConnected}
-            mcpToolsCount={mcpToolsCount}
-            llmModel={llmModel}
-          />
+              <MeasurePanel
+                isOpen={isMeasurePanelOpen}
+                onClose={() => setIsMeasurePanelOpen(false)}
+                type={measureType}
+              />
 
-          {/* 对话侧边栏 */}
-          <ChatSidebar
-            isOpen={isChatOpen}
-            onToggle={() => setIsChatOpen(!isChatOpen)}
-            messages={chatMessages}
-            onSendMessage={handleSendCommand}
-            onClearMessages={() => setChatMessages([])}
-            isProcessing={isProcessing}
-            isConnected={wsConnected}
-          />
+              <SearchPanel
+                isOpen={isSearchPanelOpen}
+                onClose={() => setIsSearchPanelOpen(false)}
+                initialQuery={searchQuery}
+              />
 
-          {/* 调试面板 - MCP 开发调试用 */}
-          <DebugPanel />
-        </main>
-      </div>
-    </CesiumProvider>
+              <StatusBar
+                wsConnected={wsConnected}
+                mcpToolsCount={mcpToolsCount}
+                llmModel={llmModel}
+              />
+
+              {/* 对话侧边栏 */}
+              <ChatSidebar
+                isOpen={isChatOpen}
+                onToggle={() => setIsChatOpen(!isChatOpen)}
+                messages={chatMessages}
+                onSendMessage={handleSendCommand}
+                onClearMessages={() => setChatMessages([])}
+                isProcessing={isProcessing}
+                isConnected={wsConnected}
+              />
+
+              {/* 调试面板 - MCP 开发调试用 */}
+              <DebugPanel />
+            </main>
+          </div>
+        </CesiumProvider>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }
 

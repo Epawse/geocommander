@@ -1,9 +1,11 @@
 /**
  * WebSocket 服务 - 连接 MCP Server
- * 
+ *
  * 负责与 Python MCP Server 建立 WebSocket 连接，
  * 接收来自 LLM 的工具调用指令并分发到前端执行
  */
+
+import { WS_URL } from '../config/mapConfig';
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -50,7 +52,7 @@ class WebSocketService {
   private messageQueue: MCPAction[] = [];
   private lastChatToolCallId: string | null = null; // 追踪 chat_response 已处理的 tool_call
 
-  constructor(url: string = 'ws://localhost:8765/ws') {
+  constructor(url: string = WS_URL) {
     this.url = url;
   }
 

@@ -1,10 +1,19 @@
 import * as Cesium from 'cesium';
 
-// 天地图 Token (公开测试Token)
-export const TIANDITU_TOKEN = '4267820f43926eaf808d61dc07269beb';
+// Environment-based tokens (loaded from .env.local)
+// Fallback to demo tokens if not configured (for development only)
+const DEFAULT_TIANDITU_TOKEN = '4267820f43926eaf808d61dc07269beb';
+const DEFAULT_CESIUM_ION_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYTEyMjIzYi1jZDUzLTRlZjAtOWE0OC00MTU4ODM4ZjA0YjYiLCJpZCI6MjU5LCJpYXQiOjE3MzI1MjUyMDB9.DcKHJc1Rp6iCTjzT1hPfMzVLt7t6Z';
 
-// Cesium Ion Token (可选，用于地形)
-export const CESIUM_ION_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYTEyMjIzYi1jZDUzLTRlZjAtOWE0OC00MTU4ODM4ZjA0YjYiLCJpZCI6MjU5LCJpYXQiOjE3MzI1MjUyMDB9.DcKHJc1Rp6iCTjzT1hPfMzVLt7t6Z';
+// Tianditu Map Token
+export const TIANDITU_TOKEN = import.meta.env.VITE_TIANDITU_TOKEN || DEFAULT_TIANDITU_TOKEN;
+
+// Cesium Ion Token (optional, for terrain)
+export const CESIUM_ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN || DEFAULT_CESIUM_ION_TOKEN;
+
+// Backend URLs
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8765';
+export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8765/ws';
 
 // 天地图底图配置 (使用 {z}, {x}, {y} 作为 Cesium UrlTemplateImageryProvider 的占位符)
 export const TiandituLayers = {
