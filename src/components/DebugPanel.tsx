@@ -271,32 +271,32 @@ export default function DebugPanel() {
         </button>
       </div>
 
-      {/* 日志标签页 - 过滤器 */}
+      {/* 日志标签页 */}
       {activeTab === 'logs' && (
-      <div className="debug-panel-filters">
-        <button 
-          className={filter === 'all' ? 'active' : ''} 
-          onClick={() => setFilter('all')}
-        >
-          全部 ({logs.length})
-        </button>
-        {Object.entries(typeConfig).map(([key, config]) => {
-          const count = logs.filter(l => l.type === key).length;
-          return (
-            <button 
-              key={key}
-              className={filter === key ? 'active' : ''} 
-              onClick={() => setFilter(key)}
-              style={{ '--type-color': config.color } as React.CSSProperties}
+        <>
+          <div className="debug-panel-filters">
+            <button
+              className={filter === 'all' ? 'active' : ''}
+              onClick={() => setFilter('all')}
             >
-              {config.icon} {count}
+              全部 ({logs.length})
             </button>
-          );
-        })}
-      </div>
+            {Object.entries(typeConfig).map(([key, config]) => {
+              const count = logs.filter(l => l.type === key).length;
+              return (
+                <button
+                  key={key}
+                  className={filter === key ? 'active' : ''}
+                  onClick={() => setFilter(key)}
+                  style={{ '--type-color': config.color } as React.CSSProperties}
+                >
+                  {config.icon} {count}
+                </button>
+              );
+            })}
+          </div>
 
-      {/* 日志列表 */}
-      <div className="debug-panel-logs">
+          <div className="debug-panel-logs">
         {filteredLogs.length === 0 ? (
           <div className="debug-panel-empty">
             <span>暂无日志</span>
@@ -326,6 +326,7 @@ export default function DebugPanel() {
         )}
         <div ref={logsEndRef} />
       </div>
+        </>
       )}
 
       {/* MCP 测试标签页 */}
