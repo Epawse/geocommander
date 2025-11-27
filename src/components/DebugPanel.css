@@ -293,3 +293,237 @@
 .debug-log-mcp { --type-color: #FF9800; }
 .debug-log-system { --type-color: #9E9E9E; }
 .debug-log-error { --type-color: #F44336; }
+
+/* ===================== 标签页切换 ===================== */
+.debug-panel-tabs {
+  display: flex;
+  gap: 0;
+  background: rgba(0, 0, 0, 0.4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.debug-panel-tabs button {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #888;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+  position: relative;
+}
+
+.debug-panel-tabs button:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ccc;
+}
+
+.debug-panel-tabs button.active {
+  color: #FF9800;
+  border-bottom-color: #FF9800;
+  background: rgba(255, 152, 0, 0.1);
+}
+
+.mcp-connected-badge {
+  color: #4CAF50;
+  margin-left: 4px;
+  font-size: 8px;
+}
+
+/* ===================== MCP 测试面板 ===================== */
+.debug-mcp-panel {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* MCP 状态区域 */
+.mcp-status-section {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.mcp-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mcp-status-indicator {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mcp-status-indicator.connected {
+  color: #4CAF50;
+}
+
+.mcp-status-indicator.disconnected {
+  color: #F44336;
+}
+
+.mcp-refresh-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.mcp-refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.mcp-status-info {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #888;
+}
+
+/* 工具选择 */
+.mcp-tool-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mcp-tool-section label {
+  font-size: 11px;
+  color: #888;
+}
+
+.mcp-tool-section select {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e0e0e0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mcp-tool-section select:focus {
+  outline: none;
+  border-color: #FF9800;
+}
+
+.mcp-tool-section select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 工具描述 */
+.mcp-tool-description {
+  font-size: 11px;
+  color: #888;
+  background: rgba(255, 152, 0, 0.1);
+  padding: 8px 10px;
+  border-radius: 4px;
+  border-left: 2px solid #FF9800;
+  line-height: 1.4;
+}
+
+/* 参数输入 */
+.mcp-args-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mcp-args-section label {
+  font-size: 11px;
+  color: #888;
+}
+
+.mcp-args-section textarea {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #8bc34a;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Consolas', monospace;
+  font-size: 11px;
+  min-height: 80px;
+  resize: vertical;
+}
+
+.mcp-args-section textarea:focus {
+  outline: none;
+  border-color: #FF9800;
+}
+
+.mcp-args-section textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 执行按钮 */
+.mcp-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mcp-call-btn {
+  flex: 1;
+  background: linear-gradient(135deg, #FF9800, #F57C00);
+  border: none;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.mcp-call-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #FFB74D, #FF9800);
+  transform: translateY(-1px);
+}
+
+.mcp-call-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 快捷测试 */
+.mcp-quick-tests {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.quick-test-label {
+  font-size: 10px;
+  color: #666;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+.mcp-quick-tests button {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ccc;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.2s;
+}
+
+.mcp-quick-tests button:hover {
+  background: rgba(255, 152, 0, 0.2);
+  border-color: #FF9800;
+  color: #FF9800;
+}

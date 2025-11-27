@@ -30,6 +30,8 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 
+# MCP 客户端
+from mcp_client import get_mcp_client, init_mcp_client, MCPClient
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -527,6 +529,7 @@ class ChatAssistant:
         self.llm_client = None
         self.conversation_history: List[Dict[str, str]] = []
         self.max_history = 10  # 保留最近 10 轮对话
+        self._mcp_tools_cache: Optional[str] = None  # MCP 工具描述缓存
 
         if use_llm:
             from llm_providers import provider_manager
@@ -539,6 +542,34 @@ class ChatAssistant:
                 logger.warning(
                     "[ChatAssistant] No LLM provider available, falling back to rules")
                 self.use_llm = False
+
+    def _get_mcp_tools_description(self) -> str:
+        """获取 MCP 工具描述（用于 System Prompt）"""
+        mcp_client = get_mcp_client()
+        if mcp_client.connected:
+            return mcp_client.get_tools_description()
+        return ""
+
+    def _build_dynamic_prompt(self, base_prompt: str) -> str:
+        """构建动态 System Prompt，注入 MCP 工具信息"""
+        mcp_client = get_mcp_client()
+
+        if not mcp_client.connected:
+            return base_prompt
+
+        # 获取 MCP 工具列表
+        tools_desc = self._get_mcp_tools_description()
+
+        # 在 prompt 中替换或追加工具信息
+        # 查找工具列表标记并替换
+        if "## 可用的地图操作工具" in base_prompt:
+            # 替换工具列表部分
+            import re
+            pattern = r"## 可用的地图操作工具\n.*?(?=\n## |\n\n## |$)"
+            replacement = f"## 可用的地图操作工具\n{tools_desc}"
+            return re.sub(pattern, replacement, base_prompt, flags=re.DOTALL)
+
+        return base_prompt
 
     def refresh_client(self):
         """刷新 LLM 客户端（模型切换后调用）"""
@@ -1059,11 +1090,34 @@ manager = ConnectionManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🚀 GeoCommander MCP Server starting...")
-    print(f"📍 Loaded {len(LOCATIONS)} locations")
-    print(f"🛠️  Registered {len(MCP_TOOLS)} MCP tools")
+    print("🚀 GeoCommander Server starting...")
+
+    # 初始化 MCP 客户端
+    mcp_command = os.getenv("MCP_SERVER_COMMAND", "python -m mcp_geo_tools")
+    print(f"🔌 Connecting to MCP server: {mcp_command}")
+
+    try:
+        mcp_client = await init_mcp_client(mcp_command)
+        if mcp_client.connected:
+            print(f"✅ MCP connected! {len(mcp_client.tools)} tools available")
+            for tool in mcp_client.tools:
+                print(f"   - {tool.name}")
+        else:
+            print("⚠️  MCP connection failed, using fallback mode")
+    except Exception as e:
+        print(f"⚠️  MCP initialization error: {e}")
+
+    # 兼容旧代码的输出
+    print(f"📍 Fallback locations: {len(LOCATIONS)}")
+
     yield
-    print("👋 GeoCommander MCP Server shutting down...")
+
+    # 断开 MCP 连接
+    mcp_client = get_mcp_client()
+    if mcp_client.connected:
+        await mcp_client.disconnect()
+
+    print("👋 GeoCommander Server shutting down...")
 
 app = FastAPI(
     title="GeoCommander MCP Server",
@@ -1100,13 +1154,20 @@ async def root():
     except:
         pass
 
+    # 获取 MCP 状态
+    mcp_client = get_mcp_client()
+    mcp_info = {
+        "connected": mcp_client.connected,
+        "tools": [t.name for t in mcp_client.tools] if mcp_client.connected else []
+    }
+
     return {
-        "name": "GeoCommander MCP Server",
-        "version": "1.0.0",
+        "name": "GeoCommander Server",
+        "version": "2.0.0",
         "status": "running",
-        "tools": [tool.name for tool in MCP_TOOLS],
-        "locations": len(LOCATIONS),
-        "llm": llm_info
+        "mcp": mcp_info,
+        "llm": llm_info,
+        "fallback_locations": len(LOCATIONS)
     }
 
 
@@ -1127,6 +1188,117 @@ async def get_locations():
             for name, loc in LOCATIONS.items()
         }
     }
+
+
+# ===================== MCP 相关端点 =====================
+
+@app.get("/mcp/status")
+async def mcp_status():
+    """获取 MCP 客户端状态"""
+    mcp_client = get_mcp_client()
+    return {
+        "connected": mcp_client.connected,
+        "tools_count": len(mcp_client.tools) if mcp_client.connected else 0,
+        "tools": [t.name for t in mcp_client.tools] if mcp_client.connected else []
+    }
+
+
+@app.get("/mcp/tools")
+async def mcp_tools():
+    """获取 MCP 工具列表"""
+    mcp_client = get_mcp_client()
+    if not mcp_client.connected:
+        return {"error": "MCP not connected", "tools": []}
+
+    return {
+        "tools": [
+            {
+                "name": t.name,
+                "description": t.description,
+                "parameters": t.input_schema
+            }
+            for t in mcp_client.tools
+        ]
+    }
+
+
+@app.get("/mcp/resources")
+async def mcp_resources():
+    """获取 MCP 资源列表"""
+    mcp_client = get_mcp_client()
+    if not mcp_client.connected:
+        return {"error": "MCP not connected", "resources": []}
+
+    resources = await mcp_client.get_resources()
+    return {"resources": resources}
+
+
+@app.get("/mcp/prompts")
+async def mcp_prompts():
+    """获取 MCP 提示词列表"""
+    mcp_client = get_mcp_client()
+    if not mcp_client.connected:
+        return {"error": "MCP not connected", "prompts": []}
+
+    prompts = await mcp_client.get_prompts()
+    return {"prompts": prompts}
+
+
+class MCPToolCallRequest(BaseModel):
+    """MCP 工具调用请求"""
+    tool: str
+    arguments: Dict[str, Any] = {}
+    broadcast: bool = True  # 是否广播到前端
+
+
+@app.post("/mcp/call")
+async def mcp_call_tool(request: MCPToolCallRequest):
+    """
+    调用 MCP 工具
+
+    这是测试 MCP 工具的主要端点。
+    调用工具后，如果 broadcast=True，会将结果广播到已连接的前端。
+
+    示例请求:
+    POST /mcp/call
+    {
+        "tool": "fly_to_location",
+        "arguments": {"name": "北京"},
+        "broadcast": true
+    }
+    """
+    mcp_client = get_mcp_client()
+
+    if not mcp_client.connected:
+        return {
+            "success": False,
+            "error": "MCP not connected"
+        }
+
+    # 调用 MCP 工具
+    result = await mcp_client.call_tool(request.tool, request.arguments)
+
+    logger.info(f"[MCP Call] {request.tool}({request.arguments}) -> {result}")
+
+    # 如果需要广播到前端
+    if request.broadcast and result.get("action"):
+        tool_call = MCPToolCall(
+            id=str(uuid.uuid4()),
+            action=result.get("action"),
+            arguments=result.get("arguments", {})
+        )
+
+        # 广播到所有已连接的客户端
+        for ws in manager.active_connections:
+            try:
+                await manager.send_action(ws, tool_call)
+            except Exception as e:
+                logger.warning(f"[MCP Call] Failed to broadcast: {e}")
+
+        result["broadcasted"] = True
+        result["clients"] = len(manager.active_connections)
+
+    return result
 
 
 @app.get("/providers")
@@ -1192,6 +1364,69 @@ class ChatRequest(BaseModel):
     """聊天请求"""
     message: str
     system_prompt: Optional[str] = None
+
+
+class ExecuteRequest(BaseModel):
+    """执行请求 - 用于 MCP Server 远程执行"""
+    action: str
+    arguments: Dict[str, Any] = {}
+
+
+@app.post("/execute")
+async def execute_action(request: ExecuteRequest):
+    """
+    执行动作端点 - 供 MCP Server 远程调用
+
+    接收来自 mcp-geo-tools 的动作命令，广播到已连接的 WebSocket 客户端。
+    这使得 MCP Server 可以通过 HTTP 直接控制 Cesium 前端。
+
+    Args:
+        request: 包含 action 名称和 arguments 参数的请求体
+
+    Returns:
+        执行结果，包括成功状态和已通知的客户端数量
+    """
+    try:
+        # 创建工具调用对象
+        tool_call = MCPToolCall(
+            id=str(uuid.uuid4()),
+            action=request.action,
+            arguments=request.arguments
+        )
+
+        # 广播到所有已连接的 WebSocket 客户端
+        connected_count = len(manager.active_connections)
+
+        if connected_count == 0:
+            return {
+                "success": False,
+                "error": "No connected clients",
+                "message": "没有已连接的客户端，请确保 Cesium 前端已打开并连接"
+            }
+
+        # 向所有客户端发送动作
+        for websocket in manager.active_connections:
+            try:
+                await manager.send_action(websocket, tool_call)
+            except Exception as e:
+                logger.warning(f"Failed to send action to client: {e}")
+
+        logger.info(f"[Execute API] Executed {request.action} to {connected_count} clients")
+
+        return {
+            "success": True,
+            "action": request.action,
+            "arguments": request.arguments,
+            "clients_notified": connected_count,
+            "message": f"动作已发送到 {connected_count} 个客户端"
+        }
+
+    except Exception as e:
+        logger.error(f"[Execute API] Error: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 
 @app.post("/chat")
