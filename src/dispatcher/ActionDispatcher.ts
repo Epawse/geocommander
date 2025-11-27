@@ -9,16 +9,21 @@ import * as Cesium from 'cesium';
 import type { MCPAction, MCPResponse } from '../services/WebSocketService';
 import { createTiandituImageryProvider } from '../config/mapConfig';
 
-// 支持的动作类型
+// 支持的动作类型（包含 MCP 工具别名）
 export type ActionType =
   | 'fly_to'
+  | 'fly_to_location'        // MCP alias
   | 'switch_basemap'
+  | 'switch_basemap_by_name' // MCP alias
   | 'add_marker'
+  | 'add_marker_at_location' // MCP alias
   | 'remove_marker'
   | 'clear_markers'
   | 'set_weather'
+  | 'set_weather_by_name'    // MCP alias
   | 'clear_weather'
   | 'set_time'
+  | 'set_time_by_name'       // MCP alias
   | 'reset_view'
   | 'get_camera_position'
   | 'measure_distance'

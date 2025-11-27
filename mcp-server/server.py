@@ -33,6 +33,9 @@ load_dotenv()
 # MCP 客户端
 from mcp_client import get_mcp_client, init_mcp_client, MCPClient
 
+# Bridge 层 - 原生 Function Calling 支持
+from bridge import get_bridge, LLMBridge, ToolCall, ToolCallStatus
+
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -75,100 +78,15 @@ class LLMResponse(BaseModel):
     tool_call: Optional[Dict[str, Any]] = None  # 可选的工具调用
     thinking: Optional[str] = None  # 可选的思考过程
 
-# ===================== 知识库 =====================
-
-
-# 常用地点数据库
-LOCATIONS: Dict[str, Location] = {
-    "北京": Location(name="北京", longitude=116.4074, latitude=39.9042, altitude=5000),
-    "天安门": Location(name="天安门广场", longitude=116.3972, latitude=39.9087, altitude=1000),
-    "故宫": Location(name="故宫", longitude=116.3972, latitude=39.9169, altitude=800),
-    "上海": Location(name="上海", longitude=121.4737, latitude=31.2304, altitude=5000),
-    "外滩": Location(name="上海外滩", longitude=121.4909, latitude=31.2397, altitude=500),
-    "东方明珠": Location(name="东方明珠塔", longitude=121.4997, latitude=31.2397, altitude=800),
-    "广州": Location(name="广州", longitude=113.2644, latitude=23.1291, altitude=5000),
-    "广州塔": Location(name="广州塔", longitude=113.3244, latitude=23.1066, altitude=800),
-    "深圳": Location(name="深圳", longitude=114.0579, latitude=22.5431, altitude=5000),
-    "香港": Location(name="香港", longitude=114.1694, latitude=22.3193, altitude=5000),
-    "维多利亚港": Location(name="维多利亚港", longitude=114.1747, latitude=22.3035, altitude=500),
-    "杭州": Location(name="杭州", longitude=120.1551, latitude=30.2741, altitude=5000),
-    "西湖": Location(name="西湖", longitude=120.1485, latitude=30.2421, altitude=300),
-    "成都": Location(name="成都", longitude=104.0668, latitude=30.5728, altitude=5000),
-    "重庆": Location(name="重庆", longitude=106.5516, latitude=29.5630, altitude=5000),
-    "南京": Location(name="南京", longitude=118.7969, latitude=32.0603, altitude=5000),
-    "武汉": Location(name="武汉", longitude=114.3055, latitude=30.5928, altitude=5000),
-    "西安": Location(name="西安", longitude=108.9402, latitude=34.3416, altitude=5000),
-    "兵马俑": Location(name="秦始皇兵马俑", longitude=109.2785, latitude=34.3847, altitude=500),
-    "珠穆朗玛峰": Location(name="珠穆朗玛峰", longitude=86.9250, latitude=27.9881, altitude=15000),
-    "长城": Location(name="八达岭长城", longitude=116.0166, latitude=40.3539, altitude=1500),
-    "黄山": Location(name="黄山", longitude=118.1694, latitude=30.1333, altitude=2000),
-    "张家界": Location(name="张家界", longitude=110.4792, latitude=29.1170, altitude=2000),
-    "九寨沟": Location(name="九寨沟", longitude=103.9180, latitude=33.2600, altitude=3000),
-    "布达拉宫": Location(name="布达拉宫", longitude=91.1172, latitude=29.6525, altitude=4000),
-    "纽约": Location(name="纽约", longitude=-74.0060, latitude=40.7128, altitude=5000),
-    "自由女神": Location(name="自由女神像", longitude=-74.0445, latitude=40.6892, altitude=500),
-    "伦敦": Location(name="伦敦", longitude=-0.1276, latitude=51.5074, altitude=5000),
-    "巴黎": Location(name="巴黎", longitude=2.3522, latitude=48.8566, altitude=5000),
-    "埃菲尔铁塔": Location(name="埃菲尔铁塔", longitude=2.2945, latitude=48.8584, altitude=500),
-    "东京": Location(name="东京", longitude=139.6917, latitude=35.6895, altitude=5000),
-    "富士山": Location(name="富士山", longitude=138.7274, latitude=35.3606, altitude=6000),
-    "悉尼": Location(name="悉尼", longitude=151.2093, latitude=-33.8688, altitude=5000),
-    "悉尼歌剧院": Location(name="悉尼歌剧院", longitude=151.2153, latitude=-33.8568, altitude=500),
-}
-
-# 底图类型映射
-BASEMAP_TYPES = {
-    "卫星": "satellite",
-    "卫星影像": "satellite",
-    "卫星图": "satellite",
-    "影像": "satellite",
-    "矢量": "vector",
-    "矢量图": "vector",
-    "街道": "vector",
-    "道路": "vector",
-    "地形": "terrain",
-    "地形图": "terrain",
-    "高程": "terrain",
-    "深色": "dark",
-    "暗色": "dark",
-    "夜间": "dark",
-}
-
-# 天气类型映射
-WEATHER_TYPES = {
-    "下雨": "rain",
-    "雨天": "rain",
-    "降雨": "rain",
-    "雨": "rain",
-    "下雪": "snow",
-    "雪天": "snow",
-    "降雪": "snow",
-    "雪": "snow",
-    "雾": "fog",
-    "大雾": "fog",
-    "雾天": "fog",
-    "晴": "clear",
-    "晴天": "clear",
-    "清除": "clear",
-    "无": "clear",
-}
-
-# 时间预设映射
-TIME_PRESETS = {
-    "白天": "day",
-    "日间": "day",
-    "中午": "day",
-    "黑夜": "night",
-    "夜晚": "night",
-    "夜间": "night",
-    "晚上": "night",
-    "黎明": "dawn",
-    "日出": "dawn",
-    "早晨": "dawn",
-    "黄昏": "dusk",
-    "日落": "dusk",
-    "傍晚": "dusk",
-}
+# ===================== 知识库（从 MCP 动态获取） =====================
+# 注意：地点、底图、天气、时间数据现在从 MCP Server (mcp-geo-tools) 动态获取
+# 通过 Bridge 层的资源缓存机制获取，无需在此硬编码
+#
+# 可用的 MCP 资源：
+# - geo://locations - 所有地点坐标
+# - geo://basemaps - 底图类型和别名
+# - geo://weather - 天气效果和别名
+# - geo://time-presets - 时间预设和别名
 
 # ===================== MCP 工具 =====================
 # 工具定义现在由 mcp-geo-tools 包提供，通过 MCP 协议动态获取
@@ -379,10 +297,17 @@ class ChatAssistant:
 
 ## 工具列表
 
-### fly_to - 飞行到任意位置
-用户想去任何地方时使用。你知道世界上所有地方的坐标！
+### fly_to - 飞行到任意位置（推荐！）
+**始终优先使用 fly_to**，你知道世界上所有地方的坐标！
 参数：longitude, latitude, altitude（米）, duration（秒，默认2）
 高度建议：建筑物300-800m，城市3000-8000m，山峰10000m+
+
+**拼音识别**：用户可能输入拼音，你需要理解并转换为坐标：
+- "kelimulingong" → 克里姆林宫 → fly_to(37.62, 55.75, 500)
+- "jinzita" → 金字塔 → fly_to(31.13, 29.98, 1000)
+- "aifeiertieta" → 埃菲尔铁塔 → fly_to(2.29, 48.86, 300)
+- "changcheng" → 长城 → fly_to(116.02, 40.35, 2000)
+- "shandongdaxue" → 山东大学 → fly_to(117.16, 36.67, 500)
 
 ### switch_basemap - 切换底图
 参数：type = satellite | vector | terrain | dark
@@ -393,25 +318,15 @@ class ChatAssistant:
 ### set_time - 时间
 参数：preset = day | night | dawn | dusk
 
-### add_marker - 添加标记（会自动飞往该位置）
+### add_marker - 添加标记（需要坐标）
 参数：name, longitude, latitude, color（默认#FF4444）
-注意：添加标记后，前端会自动飞往该位置
 
 ### clear_markers - 清除标记
-### clear_weather - 清除天气（停止天气效果）
-### reset_view - 重置视角（回到初始视角、返回初始位置）
-
-### zoom_in - 放大视图（拉近镜头）
-参数：factor（0-1，默认0.5，值越小放大越多）
-- 放大、拉近
-
-### zoom_out - 缩小视图（拉远镜头）
-参数：factor（>1，默认2.0，值越大缩小越多）
-- 缩小、拉远
-
-### set_pitch - 调整俯仰角
-参数：pitch（-90到0度，-90=俯视，0=平视）
-- 俯视、鸟瞰、平视
+### clear_weather - 清除天气
+### reset_view - 重置视角
+### zoom_in - 放大视图（factor: 0-1）
+### zoom_out - 缩小视图（factor: >1）
+### set_pitch - 调整俯仰角（pitch: -90到0）
 
 ## 回复格式 (JSON) - 必须包含 thinking 字段
 {
@@ -423,15 +338,9 @@ class ChatAssistant:
 ## 示例
 
 "武汉大学" → {
-  "thinking": "用户想查看武汉大学。武汉大学位于湖北省武汉市，是著名高等学府，主校区坐标约(114.36, 30.54)，建议较低高度500m以便看清校园",
+  "thinking": "用户想查看武汉大学。武汉大学位于湖北省武汉市，主校区坐标约(114.36, 30.54)，建议高度500m以便看清校园",
   "message": "🛫 飞往武汉大学",
   "tool_call": {"action": "fly_to", "arguments": {"longitude": 114.3612, "latitude": 30.5371, "altitude": 500, "duration": 2}}
-}
-
-"在故宫添加标记" → {
-  "thinking": "用户想在故宫位置添加一个标记点。故宫位于北京市中心，坐标约(116.3972, 39.9169)。添加标记后前端会自动飞往",
-  "message": "📍 在故宫添加标记",
-  "tool_call": {"action": "add_marker", "arguments": {"name": "故宫", "longitude": 116.3972, "latitude": 39.9169}}
 }
 
 "暗色地图" → {
@@ -440,34 +349,10 @@ class ChatAssistant:
   "tool_call": {"action": "switch_basemap", "arguments": {"type": "dark"}}
 }
 
-"停止天气" → {
-  "thinking": "用户想清除当前天气效果，使用 clear_weather 命令",
-  "message": "☀️ 天气已清除",
-  "tool_call": {"action": "clear_weather", "arguments": {}}
-}
-
-"重置视角" → {
-  "thinking": "用户想重置视角回到初始位置，使用 reset_view 命令",
-  "message": "🔄 视角已重置",
-  "tool_call": {"action": "reset_view", "arguments": {}}
-}
-
-"放大" → {
-  "thinking": "用户想放大视图，拉近镜头。使用 zoom_in 命令，默认 factor=0.5",
-  "message": "🔍 视图已放大",
-  "tool_call": {"action": "zoom_in", "arguments": {"factor": 0.5}}
-}
-
-"缩小" → {
-  "thinking": "用户想缩小视图，拉远镜头。使用 zoom_out 命令，默认 factor=2.0",
-  "message": "🔍 视图已缩小",
-  "tool_call": {"action": "zoom_out", "arguments": {"factor": 2.0}}
-}
-
-"俯视" → {
-  "thinking": "用户想从正上方俯视地面。使用 set_pitch 命令设置俯仰角为 -90 度",
-  "message": "👁️ 切换到俯视角度",
-  "tool_call": {"action": "set_pitch", "arguments": {"pitch": -90}}
+"kelinmulingong" → {
+  "thinking": "用户输入拼音 kelinmulingong，这是克里姆林宫的拼音。克里姆林宫位于俄罗斯莫斯科，坐标约(37.62, 55.75)，建议高度500m",
+  "message": "🛫 飞往克里姆林宫",
+  "tool_call": {"action": "fly_to", "arguments": {"longitude": 37.6176, "latitude": 55.7520, "altitude": 500, "duration": 2}}
 }
 
 "你是谁" → {
@@ -479,13 +364,22 @@ class ChatAssistant:
     # 兼容旧代码
     SYSTEM_PROMPT = CONVERSATION_PROMPT
 
-    def __init__(self, use_llm: bool = False):
+    def __init__(self, use_llm: bool = False, use_function_calling: bool = True):
+        """
+        初始化 ChatAssistant
+
+        Args:
+            use_llm: 是否使用 LLM
+            use_function_calling: 是否优先使用原生 Function Calling（推荐）
+        """
         self.use_llm = use_llm
+        self.use_function_calling = use_function_calling  # 原生 Function Calling 开关
         self.llm_client = None
-        self.conversation_history: List[Dict[str, str]] = []
+        self.conversation_history: List[Dict[str, Any]] = []  # 支持工具调用消息
         self.max_history = 10  # 保留最近 10 轮对话
         self._mcp_tools_cache: Optional[str] = None  # MCP 工具描述缓存
         self._mcp_prompts_cache: Dict[str, str] = {}  # MCP prompts 缓存
+        self._bridge: Optional[LLMBridge] = None  # Bridge 层实例
 
         if use_llm:
             from llm_providers import provider_manager
@@ -494,6 +388,10 @@ class ChatAssistant:
                 provider = provider_manager.get_active()
                 logger.info(
                     f"[ChatAssistant] Using LLM: {provider.name} ({provider.model})")
+                # 检查是否支持 Function Calling
+                if use_function_calling:
+                    self._bridge = get_bridge()
+                    logger.info("[ChatAssistant] Native Function Calling enabled")
             else:
                 logger.warning(
                     "[ChatAssistant] No LLM provider available, falling back to rules")
@@ -596,10 +494,211 @@ class ChatAssistant:
         """刷新 LLM 客户端（模型切换后调用）"""
         from llm_providers import provider_manager
         self.llm_client = provider_manager.get_client()
+        # 同时刷新 Bridge 缓存
+        if self._bridge:
+            self._bridge.clear_cache()
+
+    # ===================== 原生 Function Calling 支持 =====================
+
+    async def _chat_with_function_calling(
+        self,
+        user_input: str,
+        mode: str = 'conversation'
+    ) -> Optional[Dict[str, Any]]:
+        """
+        使用原生 Function Calling 进行对话
+
+        优势：
+        1. LLM 原生支持，无需 prompt 工程
+        2. 更准确的工具调用
+        3. 支持多工具并行调用
+        4. 更好的错误处理
+
+        Args:
+            user_input: 用户输入
+            mode: 'command' 或 'conversation'
+
+        Returns:
+            响应字典或 None（如果不支持/失败）
+        """
+        if not self._bridge or not self.llm_client:
+            return None
+
+        # 获取 MCP 工具定义（OpenAI 格式）
+        tools = self._bridge.get_tools_for_openai()
+        if not tools:
+            logger.warning("[ChatAssistant] No tools available for Function Calling")
+            return None
+
+        # 构建简洁的系统提示
+        system_prompt = self._get_function_calling_system_prompt(mode)
+
+        # 构建消息列表
+        messages = [{"role": "system", "content": system_prompt}]
+
+        # 对话模式添加历史
+        if mode == 'conversation':
+            messages.extend(self.conversation_history[-self.max_history * 2:])
+
+        messages.append({"role": "user", "content": user_input})
+
+        try:
+            # 调用 LLM（带工具）
+            response = await self.llm_client.chat_with_tools(
+                messages=messages,
+                tools=tools,
+                temperature=0.3 if mode == 'command' else 0.7,
+                max_tokens=1024,
+                tool_choice="auto"
+            )
+
+            logger.info(f"[ChatAssistant] Function Calling response: {response.finish_reason}")
+
+            # 处理工具调用
+            tool_call_result = None
+            if response.tool_calls:
+                # 执行工具调用（只执行第一个）
+                tc = response.tool_calls[0]
+                func = tc.get("function", {})
+                tool_name = func.get("name", "")
+                tool_args = func.get("arguments", {})
+
+                if isinstance(tool_args, str):
+                    tool_args = json.loads(tool_args)
+
+                # 规范化工具名称（Gemini 可能添加 default_api. 前缀）
+                if tool_name.startswith("default_api."):
+                    tool_name = tool_name[len("default_api."):]
+                    logger.info(f"[ChatAssistant] Normalized tool name: {tool_name}")
+
+                logger.info(f"[ChatAssistant] Executing tool: {tool_name}({tool_args})")
+
+                # 通过 Bridge 执行工具
+                exec_result = await self._bridge.execute_tool(tool_name, tool_args)
+
+                # 检查 MCP 是否返回错误（如地点未找到）
+                if exec_result.get("error"):
+                    logger.warning(f"[ChatAssistant] MCP tool error: {exec_result.get('error')}")
+                    # 返回错误消息，不执行 action
+                    return {
+                        "message": exec_result.get("message", f"操作失败: {exec_result.get('error')}"),
+                        "tool_call": None,
+                        "error": exec_result.get("error")
+                    }
+
+                # 使用 MCP 执行结果（如 fly_to_location 解析为 fly_to + 坐标）
+                # 如果 MCP 返回了 action，使用它；否则使用原始工具名
+                resolved_action = exec_result.get("action", tool_name)
+                resolved_args = exec_result.get("arguments", tool_args)
+
+                tool_call_result = {
+                    "action": resolved_action,
+                    "arguments": resolved_args
+                }
+
+                logger.info(f"[ChatAssistant] Resolved action: {resolved_action}({resolved_args})")
+
+            # 构建响应
+            result = {
+                "message": response.content or "好的，已执行操作。",
+                "tool_call": tool_call_result,
+                "llm_raw": json.dumps(response.raw_response, ensure_ascii=False) if response.raw_response else None
+            }
+
+            # 对话模式更新历史
+            if mode == 'conversation':
+                self.conversation_history.append({"role": "user", "content": user_input})
+                self.conversation_history.append({
+                    "role": "assistant",
+                    "content": response.content,
+                    "tool_calls": response.tool_calls
+                })
+
+            return result
+
+        except Exception as e:
+            logger.error(f"[ChatAssistant] Function Calling error: {e}")
+            return None
+
+    def _get_function_calling_system_prompt(self, mode: str) -> str:
+        """
+        获取 Function Calling 模式的系统提示
+
+        命令模式：直接执行，不追问，使用默认参数
+        对话模式：可以互动，但也应积极执行操作
+        """
+        if mode == 'command':
+            return """你是 GeoCommander 地图命令解析器。
+
+## 核心原则
+1. **立即执行** - 收到指令立即调用工具，不追问、不确认
+2. **使用默认值** - 参数不明确时使用合理默认值
+3. **只处理地图操作** - 拒绝闲聊，只执行地图相关指令
+
+## 关键指令映射（必须直接执行）
+- "放大" → zoom_in(factor=0.5)
+- "缩小" → zoom_out(factor=2.0)
+- "俯视/鸟瞰" → set_pitch(pitch=-90)
+- "平视" → set_pitch(pitch=-30)
+- "重置" → reset_view()
+- "下雨" → set_weather(type="rain", intensity=0.5)
+- "下雪" → set_weather(type="snow", intensity=0.5)
+- "晴天/停止天气" → clear_weather()
+- "白天" → set_time(preset="day")
+- "夜晚" → set_time(preset="night")
+- "黄昏/日落" → set_time(preset="dusk")
+- "黎明/日出" → set_time(preset="dawn")
+- "卫星图" → switch_basemap(type="satellite")
+- "矢量图/街道图" → switch_basemap(type="vector")
+- "地形图" → switch_basemap(type="terrain")
+- "深色/暗色" → switch_basemap(type="dark")
+
+## 地点导航 - 极其重要！
+**必须使用 fly_to**，直接提供坐标（你知道世界上所有地点的坐标）：
+- fly_to(longitude, latitude, altitude) - 适用于任何地点
+- 例如：fly_to(116.4, 39.9, 5000) 飞往北京
+- 例如：fly_to(37.62, 55.75, 500) 飞往克里姆林宫
+- 例如：fly_to(31.13, 29.98, 1000) 飞往吉萨金字塔
+- 例如：fly_to(117.16, 36.67, 500) 飞往山东大学
+
+**拼音识别**：用户可能输入拼音，你需要理解并转换为坐标：
+- "kelimulingong" → 克里姆林宫 → fly_to(37.62, 55.75, 500)
+- "jinzita" → 金字塔 → fly_to(31.13, 29.98, 1000)
+- "aifeiertieta" → 埃菲尔铁塔 → fly_to(2.29, 48.86, 300)
+- "shandongdaxue" → 山东大学 → fly_to(117.16, 36.67, 500)
+
+## 重要
+- **绝对不要使用 fly_to_location**，始终使用 fly_to 并提供坐标
+- 绝对不要追问"您想放大多少"之类的问题
+- 绝对不要要求用户提供更多信息
+- 直接使用默认参数执行操作"""
+        else:
+            return """你是 GeoCommander，一个智能地理空间助手。
+
+## 你的能力
+1. **地图操作** - 导航、底图切换、天气、时间、标记等
+2. **自然对话** - 友好交流，回答地理问题
+3. **地理知识** - 你知道世界上所有地点的坐标
+
+## 行为准则
+- 当用户表达操作意图时，立即调用相应工具
+- 可以简短解释正在做什么
+- 如果用户闲聊，友好回应并推荐探索功能
+- 优先执行操作，而非询问确认
+
+## 默认参数
+- 放大: factor=0.5
+- 缩小: factor=2.0
+- 天气强度: intensity=0.5
+- 飞行高度: 建筑物500m, 城市5000m, 山峰10000m"""
 
     async def chat(self, user_input: str, mode: str = 'conversation', thinking: bool = False) -> Dict[str, Any]:
         """
         处理用户输入，返回 AI 回复和可能的工具调用
+
+        执行策略（按优先级）：
+        1. 原生 Function Calling（推荐，更准确）
+        2. Prompt-based JSON 响应（回退方案）
 
         Args:
             user_input: 用户输入的文本
@@ -615,6 +714,25 @@ class ChatAssistant:
                 "thinking": "思考过程（仅 thinking=True 时）"
             }
         """
+        if not self.use_llm or not self.llm_client:
+            logger.warning("[ChatAssistant] LLM not available")
+            return {
+                "message": "⚠️ AI 服务未启用。请检查后端配置或联系管理员。",
+                "tool_call": None
+            }
+
+        # 策略1: 优先使用原生 Function Calling（不支持 thinking 模式时）
+        if self.use_function_calling and self._bridge and not thinking:
+            logger.info("[ChatAssistant] Trying native Function Calling...")
+            result = await self._chat_with_function_calling(user_input, mode)
+            if result:
+                logger.info("[ChatAssistant] Function Calling succeeded")
+                return result
+            logger.warning("[ChatAssistant] Function Calling failed, falling back to prompt-based")
+
+        # 策略2: 回退到 Prompt-based JSON 响应
+        logger.info("[ChatAssistant] Using prompt-based approach...")
+
         # 确定 prompt key
         if mode == 'command':
             prompt_key = 'command_thinking' if thinking else 'command'
@@ -638,65 +756,18 @@ class ChatAssistant:
             # 动态注入 MCP 工具列表（仅 fallback 模式需要）
             system_prompt = self._build_dynamic_prompt(base_prompt)
 
-        # 必须使用 LLM
-        if self.use_llm and self.llm_client:
-            result = await self._chat_with_llm(user_input, system_prompt, mode)
-            if result:
-                return result
-            # LLM 调用失败
-            logger.error("[ChatAssistant] LLM chat failed")
-            return {
-                "message": "⚠️ AI 服务暂时不可用，请稍后再试。",
-                "tool_call": None
-            }
+        result = await self._chat_with_llm(user_input, system_prompt, mode)
+        if result:
+            return result
 
-        # LLM 未启用或不可用，明确告知用户
-        logger.warning("[ChatAssistant] LLM not available")
+        # LLM 调用失败
+        logger.error("[ChatAssistant] LLM chat failed")
         return {
-            "message": "⚠️ AI 服务未启用。请检查后端配置或联系管理员。",
+            "message": "⚠️ AI 服务暂时不可用，请稍后再试。",
             "tool_call": None
         }
 
-    # ==================== 以下为内部保留代码，不对外暴露 ====================
-
-    async def _fallback_to_rules(self, user_input: str, mode: str) -> Dict[str, Any]:
-        """
-        规则解析回退机制（保留但不使用）
-
-        注意：此方法已弃用，保留仅供参考和调试
-        生产环境应始终使用 LLM，不应回退到简单规则匹配
-        """
-        tool_call = self._parse_with_rules(user_input)
-
-        if tool_call:
-            action_names = {
-                "fly_to": "🛫 飞往目标位置",
-                "switch_basemap": "🗺️ 切换底图",
-                "add_marker": "📍 添加标记",
-                "set_weather": "🌤️ 设置天气效果",
-                "set_time": "🕐 设置场景时间",
-                "clear_markers": "🗑️ 清除标记",
-                "clear_weather": "☀️ 清除天气效果"
-            }
-            return {
-                "message": action_names.get(tool_call.action, f"执行 {tool_call.action}"),
-                "tool_call": {
-                    "action": tool_call.action,
-                    "arguments": tool_call.arguments
-                }
-            }
-
-        # 无法识别时的回复
-        if mode == 'command':
-            return {
-                "message": "❌ 无法识别的命令\n\n命令模式仅支持地图操作：\n📍 导航：北京、去上海、飞到西湖\n🗺️ 底图：卫星图、矢量、地形\n🌧️ 天气：下雨、下雪、晴天\n🕐 时间：白天、夜晚、黎明\n\n💡 如需自由对话，请切换到「对话模式」",
-                "tool_call": None
-            }
-        else:
-            return {
-                "message": "抱歉，我暂时无法处理你的请求。可以试试：\n• 飞到北京\n• 切换到卫星图\n• 显示下雨效果",
-                "tool_call": None
-            }
+    # ==================== Prompt-based LLM 调用（回退方案）====================
 
     async def _chat_with_llm(self, user_input: str, system_prompt: str, mode: str) -> Optional[Dict[str, Any]]:
         """使用 LLM 进行对话"""
@@ -757,7 +828,7 @@ class ChatAssistant:
             logger.error(f"[ChatAssistant] LLM error: {e}")
             return None
 
-    # 保留规则解析作为备用
+    # 兼容旧接口
     async def parse(self, user_input: str, mode: str = 'conversation') -> Optional[MCPToolCall]:
         """兼容旧接口：解析用户输入，返回工具调用"""
         result = await self.chat(user_input, mode=mode)
@@ -768,240 +839,6 @@ class ChatAssistant:
                 action=tc["action"],
                 arguments=tc.get("arguments", {})
             )
-        return None
-
-    def _parse_with_rules(self, user_input: str) -> Optional[MCPToolCall]:
-        """使用规则匹配解析意图（演示/备用）"""
-
-        text = user_input.strip()
-        text_lower = text.lower()
-
-        logger.info(f"[ChatAssistant] Rule parsing: '{text}'")
-
-        # 0. 重置/复位命令
-        if text in ["重置", "复位", "reset", "初始化", "恢复默认"]:
-            # 清除天气 + 切换到卫星图 (通过返回 clear_weather，让前端处理多步操作)
-            return MCPToolCall(
-                id=str(uuid.uuid4()),
-                action="clear_weather",
-                arguments={}
-            )
-
-        # 1. 快捷天气命令 - 直接输入天气词
-        quick_weather = {
-            "下雨": "rain", "雨": "rain", "雨天": "rain",
-            "下雪": "snow", "雪": "snow", "雪天": "snow",
-            "雾": "fog", "大雾": "fog", "雾天": "fog",
-            "晴天": "clear", "晴": "clear", "放晴": "clear", "天晴": "clear"
-        }
-        if text in quick_weather:
-            return MCPToolCall(
-                id=str(uuid.uuid4()),
-                action="set_weather",
-                arguments={"type": quick_weather[text], "intensity": 0.5}
-            )
-
-        # 2. 快捷底图命令 - 直接输入底图类型
-        quick_basemap = {
-            "卫星": "satellite", "卫星图": "satellite", "影像": "satellite",
-            "矢量": "vector", "矢量图": "vector", "街道": "vector", "道路": "vector",
-            "地形": "terrain", "地形图": "terrain",
-            "深色": "dark", "暗色": "dark", "夜间模式": "dark"
-        }
-        if text in quick_basemap:
-            return MCPToolCall(
-                id=str(uuid.uuid4()),
-                action="switch_basemap",
-                arguments={"type": quick_basemap[text]}
-            )
-
-        # 3. 快捷地点命令 - 直接输入地名
-        if text in LOCATIONS:
-            loc = LOCATIONS[text]
-            return MCPToolCall(
-                id=str(uuid.uuid4()),
-                action="fly_to",
-                arguments={
-                    "longitude": loc.longitude,
-                    "latitude": loc.latitude,
-                    "altitude": loc.altitude,
-                    "duration": 2
-                }
-            )
-
-        # 4. 底图切换 (带关键词)
-        basemap_kw1 = any(kw in text for kw in ["切换", "换成", "显示", "使用"])
-        basemap_kw2 = any(kw in text for kw in [
-                          "底图", "地图", "影像", "图层", "卫星", "矢量", "地形", "深色"])
-        logger.info(
-            f"[ChatAssistant] Basemap check: kw1={basemap_kw1}, kw2={basemap_kw2}")
-        if basemap_kw1 and basemap_kw2:
-            logger.info(f"[ChatAssistant] Matched switch_basemap keywords")
-            return self._parse_switch_basemap(text)
-
-        # 5. 飞行指令
-        if any(kw in text for kw in ["飞到", "飞往", "前往", "去", "看看"]):
-            logger.info(f"[IntentParser] Matched fly_to keywords")
-            return self._parse_fly_to(text)
-
-        # 6. 添加标记
-        if any(kw in text for kw in ["添加", "标记", "放置", "标注"]) and \
-           any(kw in text for kw in ["标记", "点", "图标", "marker"]):
-            return self._parse_add_marker(text)
-
-        # 7. 天气效果 (带关键词)
-        if any(kw in text for kw in ["天气", "下雨", "下雪", "雾", "晴", "效果"]):
-            return self._parse_set_weather(text)
-
-        # 8. 时间设置
-        if any(kw in text for kw in ["时间", "白天", "夜晚", "黎明", "黄昏", "日出", "日落"]):
-            return self._parse_set_time(text)
-
-        # 9. 清除操作
-        if "清除" in text or "清空" in text:
-            if "标记" in text:
-                return MCPToolCall(
-                    id=str(uuid.uuid4()),
-                    action="clear_markers",
-                    arguments={}
-                )
-            if "天气" in text:
-                return MCPToolCall(
-                    id=str(uuid.uuid4()),
-                    action="clear_weather",
-                    arguments={}
-                )
-
-        logger.warning(f"[IntentParser] Could not parse: {text}")
-        # 无法解析
-        return None
-
-    def _parse_fly_to(self, text: str) -> Optional[MCPToolCall]:
-        """解析飞行指令"""
-
-        # 尝试匹配已知地点
-        for name, loc in LOCATIONS.items():
-            if name in text:
-                # 提取高度
-                altitude = loc.altitude
-                import re
-                alt_match = re.search(r'(\d+)\s*(米|m|千米|km)', text)
-                if alt_match:
-                    value = float(alt_match.group(1))
-                    unit = alt_match.group(2)
-                    if unit in ['千米', 'km']:
-                        value *= 1000
-                    altitude = value
-
-                return MCPToolCall(
-                    id=str(uuid.uuid4()),
-                    action="fly_to",
-                    arguments={
-                        "longitude": loc.longitude,
-                        "latitude": loc.latitude,
-                        "altitude": altitude,
-                        "duration": 2
-                    }
-                )
-
-        # 尝试解析经纬度
-        import re
-        coord_match = re.search(
-            r'经度?\s*[:：]?\s*([\d.]+)[°度]?\s*[,，]?\s*纬度?\s*[:：]?\s*([\d.]+)[°度]?',
-            text
-        )
-        if coord_match:
-            return MCPToolCall(
-                id=str(uuid.uuid4()),
-                action="fly_to",
-                arguments={
-                    "longitude": float(coord_match.group(1)),
-                    "latitude": float(coord_match.group(2)),
-                    "altitude": 5000,
-                    "duration": 2
-                }
-            )
-
-        return None
-
-    def _parse_switch_basemap(self, text: str) -> Optional[MCPToolCall]:
-        """解析底图切换指令"""
-
-        for cn_name, en_type in BASEMAP_TYPES.items():
-            if cn_name in text:
-                return MCPToolCall(
-                    id=str(uuid.uuid4()),
-                    action="switch_basemap",
-                    arguments={"type": en_type}
-                )
-
-        return None
-
-    def _parse_add_marker(self, text: str) -> Optional[MCPToolCall]:
-        """解析添加标记指令"""
-
-        # 尝试找到地点
-        for name, loc in LOCATIONS.items():
-            if name in text:
-                # 提取颜色
-                color = "#FF4444"  # 默认红色
-                color_map = {
-                    "红": "#FF4444", "蓝": "#4444FF", "绿": "#44FF44",
-                    "黄": "#FFFF44", "橙": "#FF8844", "紫": "#FF44FF",
-                    "白": "#FFFFFF", "黑": "#333333"
-                }
-                for cn_color, hex_color in color_map.items():
-                    if cn_color in text:
-                        color = hex_color
-                        break
-
-                return MCPToolCall(
-                    id=str(uuid.uuid4()),
-                    action="add_marker",
-                    arguments={
-                        "name": loc.name,
-                        "longitude": loc.longitude,
-                        "latitude": loc.latitude,
-                        "color": color
-                    }
-                )
-
-        return None
-
-    def _parse_set_weather(self, text: str) -> Optional[MCPToolCall]:
-        """解析天气设置指令"""
-
-        for cn_weather, en_type in WEATHER_TYPES.items():
-            if cn_weather in text:
-                # 提取强度
-                intensity = 0.5
-                if "大" in text or "强" in text:
-                    intensity = 0.8
-                elif "小" in text or "弱" in text:
-                    intensity = 0.3
-
-                return MCPToolCall(
-                    id=str(uuid.uuid4()),
-                    action="set_weather",
-                    arguments={
-                        "type": en_type,
-                        "intensity": intensity
-                    }
-                )
-
-        return None
-
-    def _parse_set_time(self, text: str) -> Optional[MCPToolCall]:
-        """解析时间设置指令"""
-
-        for cn_time, en_preset in TIME_PRESETS.items():
-            if cn_time in text:
-                return MCPToolCall(
-                    id=str(uuid.uuid4()),
-                    action="set_time",
-                    arguments={"preset": en_preset}
-                )
-
         return None
 
 # ===================== WebSocket 连接管理 =====================
@@ -1095,7 +932,8 @@ class ConnectionManager:
             # 使用 ChatAssistant 处理，传入 mode 和 thinking 参数
             result = await self.assistant.chat(user_text, mode=mode, thinking=thinking)
 
-            # 发送对话响应（包含 LLM 原始输出和思考过程用于调试）
+            # 发送对话响应（包含工具调用、LLM 原始输出和思考过程）
+            # 注意：tool_call 已包含在 chat_response 中，前端会处理执行
             await self.send_chat_response(
                 websocket,
                 result.get("message", ""),
@@ -1104,17 +942,9 @@ class ConnectionManager:
                 result.get("thinking")   # 思考过程
             )
 
-            # 如果有工具调用，也发送 action 消息（兼容旧逻辑）
             if result.get("tool_call"):
                 tc = result["tool_call"]
-                tool_call = MCPToolCall(
-                    id=str(uuid.uuid4()),
-                    action=tc["action"],
-                    arguments=tc.get("arguments", {})
-                )
-                print(
-                    f"[ConnectionManager] Executing action: {tool_call.action}")
-                await self.send_action(websocket, tool_call)
+                print(f"[ConnectionManager] Tool call: {tc['action']}({tc.get('arguments', {})})")
 
         if msg_type == "response":
             # 客户端返回的执行结果
@@ -1145,8 +975,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️  MCP initialization error: {e}")
 
-    # 兼容旧代码的输出
-    print(f"📍 Fallback locations: {len(LOCATIONS)}")
+    # 预热 Bridge 资源缓存
+    bridge = get_bridge()
+    locations = await bridge.get_locations()
+    print(f"📍 MCP locations loaded: {len(locations)}")
 
     yield
 
@@ -1199,13 +1031,18 @@ async def root():
         "tools": [t.name for t in mcp_client.tools] if mcp_client.connected else []
     }
 
+    # 获取 locations 数量
+    bridge = get_bridge()
+    locations_count = len(await bridge.get_locations())
+
     return {
         "name": "GeoCommander Server",
         "version": "2.0.0",
         "status": "running",
         "mcp": mcp_info,
         "llm": llm_info,
-        "fallback_locations": len(LOCATIONS)
+        "locations_count": locations_count,
+        "function_calling": True  # 新增: 支持原生 Function Calling
     }
 
 
@@ -1230,13 +1067,10 @@ async def get_tools():
 
 @app.get("/locations")
 async def get_locations():
-    """获取所有已知地点"""
-    return {
-        "locations": {
-            name: loc.model_dump()
-            for name, loc in LOCATIONS.items()
-        }
-    }
+    """获取所有已知地点（从 MCP 资源获取）"""
+    bridge = get_bridge()
+    locations = await bridge.get_locations()
+    return {"locations": locations}
 
 
 # ===================== MCP 相关端点 =====================

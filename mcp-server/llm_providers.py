@@ -218,12 +218,22 @@ class VertexAIAuth:
         return self.credentials.get("project_id", "")
 
 
+@dataclass
+class ChatResponse:
+    """聊天响应（支持 Function Calling）"""
+    content: str  # 文本内容
+    tool_calls: Optional[List[Dict[str, Any]]] = None  # 工具调用列表
+    finish_reason: str = "stop"  # 结束原因: stop, tool_calls, length
+    raw_response: Optional[Dict[str, Any]] = None  # 原始响应
+
+
 class LLMClient:
     """
     统一的 LLM 客户端
 
     使用 OpenAI 兼容的 Chat Completions API
     支持 Vertex AI (Gemini) 的特殊处理
+    支持原生 Function Calling（tools 参数）
     """
 
     def __init__(self, provider: LLMProvider):
@@ -244,6 +254,232 @@ class LLMClient:
                     private_key=provider.private_key,
                     project_id=provider.project_id
                 )
+
+    async def chat_with_tools(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        tool_choice: str = "auto"
+    ) -> ChatResponse:
+        """
+        带工具调用的聊天请求（原生 Function Calling）
+
+        Args:
+            messages: 消息列表
+            tools: 工具定义列表（OpenAI 格式）
+            temperature: 温度参数
+            max_tokens: 最大 token 数
+            tool_choice: 工具选择策略 ("auto", "none", "required")
+
+        Returns:
+            ChatResponse 包含文本内容和可能的工具调用
+        """
+        if self.provider.type == ProviderType.VERTEX_AI:
+            return await self._chat_with_tools_vertex_ai(
+                messages, tools, temperature, max_tokens, tool_choice
+            )
+        else:
+            return await self._chat_with_tools_openai(
+                messages, tools, temperature, max_tokens, tool_choice
+            )
+
+    async def _chat_with_tools_openai(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        tool_choice: str = "auto"
+    ) -> ChatResponse:
+        """OpenAI 兼容接口的 Function Calling"""
+        url = f"{self.provider.base_url.rstrip('/')}/chat/completions"
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.provider.api_key}"
+        }
+
+        payload: Dict[str, Any] = {
+            "model": self.provider.model,
+            "messages": messages,
+            "temperature": temperature or self.provider.temperature,
+            "max_tokens": max_tokens or self.provider.max_tokens
+        }
+
+        # 添加工具定义
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = tool_choice
+
+        try:
+            response = await self.client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+
+            data = response.json()
+            choice = data["choices"][0]
+            message = choice["message"]
+
+            return ChatResponse(
+                content=message.get("content", ""),
+                tool_calls=message.get("tool_calls"),
+                finish_reason=choice.get("finish_reason", "stop"),
+                raw_response=data
+            )
+
+        except httpx.HTTPStatusError as e:
+            raise Exception(
+                f"LLM API error: {e.response.status_code} - {e.response.text}")
+        except Exception as e:
+            raise Exception(f"LLM request failed: {str(e)}")
+
+    async def _chat_with_tools_vertex_ai(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        tool_choice: str = "auto"
+    ) -> ChatResponse:
+        """Vertex AI (Gemini) 的 Function Calling"""
+        if not self.vertex_auth:
+            raise Exception("Vertex AI auth not configured")
+
+        access_token = await self.vertex_auth.get_access_token()
+
+        project_id = self.provider.project_id or self.vertex_auth.project_id
+        location = self.provider.location
+        model = self.provider.model
+
+        url = f"https://{location}-aiplatform.googleapis.com/v1/projects/{project_id}/locations/{location}/publishers/google/models/{model}:generateContent"
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        # 转换消息格式
+        contents = []
+        system_instruction = None
+
+        for msg in messages:
+            role = msg["role"]
+            content = msg.get("content", "")
+
+            if role == "system":
+                system_instruction = {"parts": [{"text": content}]}
+            elif role == "user":
+                contents.append({"role": "user", "parts": [{"text": content}]})
+            elif role == "assistant":
+                # 处理 assistant 消息（可能包含工具调用）
+                parts = []
+                if content:
+                    parts.append({"text": content})
+                if msg.get("tool_calls"):
+                    for tc in msg["tool_calls"]:
+                        func = tc.get("function", {})
+                        args = func.get("arguments", {})
+                        if isinstance(args, str):
+                            args = json.loads(args)
+                        parts.append({
+                            "functionCall": {
+                                "name": func.get("name"),
+                                "args": args
+                            }
+                        })
+                contents.append({"role": "model", "parts": parts})
+            elif role == "tool":
+                # 工具响应
+                contents.append({
+                    "role": "function",
+                    "parts": [{
+                        "functionResponse": {
+                            "name": msg.get("tool_call_id", ""),
+                            "response": {"result": content}
+                        }
+                    }]
+                })
+
+        payload: Dict[str, Any] = {
+            "contents": contents,
+            "generationConfig": {
+                "temperature": temperature or self.provider.temperature,
+                "maxOutputTokens": max_tokens or self.provider.max_tokens
+            }
+        }
+
+        if system_instruction:
+            payload["systemInstruction"] = system_instruction
+
+        # 添加工具定义（Gemini 格式）
+        if tools:
+            # 转换 OpenAI 格式到 Gemini 格式
+            function_declarations = []
+            for tool in tools:
+                if tool.get("type") == "function":
+                    func = tool["function"]
+                    function_declarations.append({
+                        "name": func["name"],
+                        "description": func.get("description", ""),
+                        "parameters": func.get("parameters", {})
+                    })
+
+            payload["tools"] = [{"functionDeclarations": function_declarations}]
+
+            # Gemini 的 tool_choice 配置
+            if tool_choice == "required":
+                payload["toolConfig"] = {"functionCallingConfig": {"mode": "ANY"}}
+            elif tool_choice == "none":
+                payload["toolConfig"] = {"functionCallingConfig": {"mode": "NONE"}}
+
+        try:
+            response = await self.client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+
+            data = response.json()
+            candidates = data.get("candidates", [])
+
+            if not candidates:
+                return ChatResponse(content="", finish_reason="stop")
+
+            candidate = candidates[0]
+            parts = candidate.get("content", {}).get("parts", [])
+
+            # 解析响应
+            text_content = ""
+            tool_calls = []
+
+            for i, part in enumerate(parts):
+                if "text" in part:
+                    text_content += part["text"]
+                elif "functionCall" in part:
+                    fc = part["functionCall"]
+                    tool_calls.append({
+                        "id": f"call_{i}",
+                        "type": "function",
+                        "function": {
+                            "name": fc["name"],
+                            "arguments": json.dumps(fc.get("args", {}))
+                        }
+                    })
+
+            finish_reason = candidate.get("finishReason", "STOP")
+            if tool_calls:
+                finish_reason = "tool_calls"
+
+            return ChatResponse(
+                content=text_content,
+                tool_calls=tool_calls if tool_calls else None,
+                finish_reason=finish_reason,
+                raw_response=data
+            )
+
+        except httpx.HTTPStatusError as e:
+            raise Exception(
+                f"Vertex AI error: {e.response.status_code} - {e.response.text}")
+        except Exception as e:
+            raise Exception(f"Vertex AI request failed: {str(e)}")
 
     async def chat(
         self,
