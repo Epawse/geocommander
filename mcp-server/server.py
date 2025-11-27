@@ -309,6 +309,18 @@ class ChatAssistant:
 ### clear_weather - 清除天气（停止天气效果）
 ### reset_view - 重置视角（回到初始视角、返回初始位置）
 
+### zoom_in - 放大视图（拉近镜头）
+参数：factor（0-1，默认0.5，值越小放大越多）
+- 放大、拉近、closer
+
+### zoom_out - 缩小视图（拉远镜头）
+参数：factor（>1，默认2.0，值越大缩小越多）
+- 缩小、拉远、farther
+
+### set_pitch - 调整俯仰角
+参数：pitch（-90到0度，-90=俯视，0=平视）
+- 俯视、鸟瞰、平视
+
 ## 回复格式 (JSON)
 {"message": "简短说明", "tool_call": {"action": "工具名", "arguments": {...}}}
 
@@ -335,6 +347,12 @@ class ChatAssistant:
 "停止天气" → {"message": "☀️ 天气已清除", "tool_call": {"action": "clear_weather", "arguments": {}}}
 
 "重置视角" → {"message": "🔄 视角已重置", "tool_call": {"action": "reset_view", "arguments": {}}}
+
+"放大" → {"message": "🔍 视图已放大", "tool_call": {"action": "zoom_in", "arguments": {"factor": 0.5}}}
+
+"缩小" → {"message": "🔍 视图已缩小", "tool_call": {"action": "zoom_out", "arguments": {"factor": 2.0}}}
+
+"俯视" → {"message": "👁️ 切换到俯视角度", "tool_call": {"action": "set_pitch", "arguments": {"pitch": -90}}}
 
 "你好" → {"message": "❌ 无法识别\\n\\n可用：导航任意地点、底图切换、天气效果、时间设置\\n💡 闲聊请用「对话模式」", "tool_call": null}'''
 
@@ -369,6 +387,18 @@ class ChatAssistant:
 ### clear_markers - 清除标记
 ### clear_weather - 清除天气（停止天气效果）
 ### reset_view - 重置视角（回到初始视角、返回初始位置）
+
+### zoom_in - 放大视图（拉近镜头）
+参数：factor（0-1，默认0.5，值越小放大越多）
+- 放大、拉近
+
+### zoom_out - 缩小视图（拉远镜头）
+参数：factor（>1，默认2.0，值越大缩小越多）
+- 缩小、拉远
+
+### set_pitch - 调整俯仰角
+参数：pitch（-90到0度，-90=俯视，0=平视）
+- 俯视、鸟瞰、平视
 
 ## 回复格式 (JSON) - 必须包含 thinking 字段
 {
@@ -409,6 +439,24 @@ class ChatAssistant:
   "tool_call": {"action": "reset_view", "arguments": {}}
 }
 
+"放大" → {
+  "thinking": "用户想放大视图，拉近镜头。使用 zoom_in 命令，默认 factor=0.5",
+  "message": "🔍 视图已放大",
+  "tool_call": {"action": "zoom_in", "arguments": {"factor": 0.5}}
+}
+
+"缩小" → {
+  "thinking": "用户想缩小视图，拉远镜头。使用 zoom_out 命令，默认 factor=2.0",
+  "message": "🔍 视图已缩小",
+  "tool_call": {"action": "zoom_out", "arguments": {"factor": 2.0}}
+}
+
+"俯视" → {
+  "thinking": "用户想从正上方俯视地面。使用 set_pitch 命令设置俯仰角为 -90 度",
+  "message": "👁️ 切换到俯视角度",
+  "tool_call": {"action": "set_pitch", "arguments": {"pitch": -90}}
+}
+
 "你是谁" → {
   "thinking": "这是闲聊问题，不是地图操作命令，应该拒绝并提示用户",
   "message": "❌ 无法识别\\n\\n可用：导航任意地点、底图切换、天气效果、时间设置\\n💡 闲聊请用「对话模式」",
@@ -444,6 +492,21 @@ class ChatAssistant:
             return mcp_client.get_tools_description()
         return ""
 
+    # 工具中文别名映射
+    TOOL_CHINESE_ALIASES = {
+        "zoom_in": "放大、拉近视角",
+        "zoom_out": "缩小、拉远视角",
+        "set_pitch": "俯视、调整俯仰角、鸟瞰",
+        "fly_to": "飞到、导航到",
+        "fly_to_location": "飞往地点",
+        "reset_view": "重置视角、回到初始位置",
+        "switch_basemap": "切换底图",
+        "set_weather": "设置天气、下雨、下雪、起雾",
+        "clear_weather": "停止天气、晴天",
+        "add_marker": "添加标记",
+        "clear_markers": "清除标记",
+    }
+
     def _build_dynamic_prompt(self, base_prompt: str) -> str:
         """构建动态 System Prompt，注入 MCP 工具信息"""
         mcp_client = get_mcp_client()
@@ -451,8 +514,14 @@ class ChatAssistant:
         if not mcp_client.connected:
             return base_prompt
 
-        # 获取 MCP 工具列表
+        # 获取 MCP 工具列表并添加中文别名
         tools_desc = self._get_mcp_tools_description()
+
+        # 添加中文别名说明
+        alias_lines = ["\n\n常用指令映射（中文 → 工具）："]
+        for tool_name, aliases in self.TOOL_CHINESE_ALIASES.items():
+            alias_lines.append(f"- {aliases} → {tool_name}")
+        tools_desc += "\n".join(alias_lines)
 
         # 在 prompt 中替换或追加工具信息
         # 查找工具列表标记并替换
