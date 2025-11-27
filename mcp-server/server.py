@@ -185,6 +185,7 @@ class ChatAssistant:
     1. 自然对话 - 回答用户问题，进行友好交流
     2. 指令执行 - 识别并执行地图操作指令
     3. 上下文记忆 - 记住对话历史（可选）
+    4. 动态 Prompt - 从 MCP 服务器获取 System Prompt
 
     支持的 LLM 服务商（参考 Cherry Studio）：
     - Ollama（本地部署）
@@ -193,8 +194,20 @@ class ChatAssistant:
     - DeepSeek
     - OpenAI / OpenAI 兼容
     - Google Vertex AI (Gemini)
+
+    Prompt 来源优先级：
+    1. MCP Server (mcp-geo-tools) 的 prompts
+    2. 本地硬编码的 fallback prompts
     """
 
+    # MCP Prompt 名称映射
+    MCP_PROMPT_NAMES = {
+        'conversation': 'geo_assistant',
+        'command': 'command_parser',
+        'command_thinking': 'command_parser_thinking',
+    }
+
+    # ============ Fallback Prompts (当 MCP 不可用时使用) ============
     # 对话模式的系统提示词
     CONVERSATION_PROMPT = '''你是 GeoCommander，一个智能的地理空间助手。你运行在一个 3D 地球可视化系统中。
 
@@ -472,6 +485,7 @@ class ChatAssistant:
         self.conversation_history: List[Dict[str, str]] = []
         self.max_history = 10  # 保留最近 10 轮对话
         self._mcp_tools_cache: Optional[str] = None  # MCP 工具描述缓存
+        self._mcp_prompts_cache: Dict[str, str] = {}  # MCP prompts 缓存
 
         if use_llm:
             from llm_providers import provider_manager
@@ -491,6 +505,50 @@ class ChatAssistant:
         if mcp_client.connected:
             return mcp_client.get_tools_description()
         return ""
+
+    async def _get_mcp_prompt(self, prompt_key: str) -> Optional[str]:
+        """
+        从 MCP Server 获取 System Prompt
+
+        Args:
+            prompt_key: 'conversation', 'command', 或 'command_thinking'
+
+        Returns:
+            MCP prompt 内容，如果获取失败返回 None
+        """
+        # 检查缓存
+        if prompt_key in self._mcp_prompts_cache:
+            return self._mcp_prompts_cache[prompt_key]
+
+        mcp_client = get_mcp_client()
+        if not mcp_client.connected:
+            logger.warning(f"[ChatAssistant] MCP not connected, cannot fetch prompt: {prompt_key}")
+            return None
+
+        # 获取 MCP prompt 名称
+        mcp_prompt_name = self.MCP_PROMPT_NAMES.get(prompt_key)
+        if not mcp_prompt_name:
+            logger.warning(f"[ChatAssistant] Unknown prompt key: {prompt_key}")
+            return None
+
+        try:
+            prompt_content = await mcp_client.get_prompt(mcp_prompt_name)
+            if prompt_content:
+                # 缓存 prompt
+                self._mcp_prompts_cache[prompt_key] = prompt_content
+                logger.info(f"[ChatAssistant] Loaded MCP prompt: {mcp_prompt_name}")
+                return prompt_content
+            else:
+                logger.warning(f"[ChatAssistant] MCP prompt not found: {mcp_prompt_name}")
+                return None
+        except Exception as e:
+            logger.error(f"[ChatAssistant] Failed to fetch MCP prompt {mcp_prompt_name}: {e}")
+            return None
+
+    def clear_prompt_cache(self):
+        """清除 prompt 缓存（当 MCP 重连时调用）"""
+        self._mcp_prompts_cache.clear()
+        logger.info("[ChatAssistant] Prompt cache cleared")
 
     # 工具中文别名映射
     TOOL_CHINESE_ALIASES = {
@@ -557,14 +615,28 @@ class ChatAssistant:
                 "thinking": "思考过程（仅 thinking=True 时）"
             }
         """
-        # 根据模式和思考开关选择不同的 system prompt
+        # 确定 prompt key
         if mode == 'command':
-            base_prompt = self.COMMAND_PROMPT_THINKING if thinking else self.COMMAND_PROMPT
+            prompt_key = 'command_thinking' if thinking else 'command'
         else:
-            base_prompt = self.CONVERSATION_PROMPT
+            prompt_key = 'conversation'
 
-        # 动态注入 MCP 工具列表
-        system_prompt = self._build_dynamic_prompt(base_prompt)
+        # 优先从 MCP 获取 prompt
+        mcp_prompt = await self._get_mcp_prompt(prompt_key)
+
+        if mcp_prompt:
+            # 使用 MCP prompt（已包含完整信息，不需要额外注入）
+            system_prompt = mcp_prompt
+            logger.debug(f"[ChatAssistant] Using MCP prompt: {prompt_key}")
+        else:
+            # 回退到本地硬编码 prompt
+            logger.info(f"[ChatAssistant] MCP prompt unavailable, using fallback: {prompt_key}")
+            if mode == 'command':
+                base_prompt = self.COMMAND_PROMPT_THINKING if thinking else self.COMMAND_PROMPT
+            else:
+                base_prompt = self.CONVERSATION_PROMPT
+            # 动态注入 MCP 工具列表（仅 fallback 模式需要）
+            system_prompt = self._build_dynamic_prompt(base_prompt)
 
         # 必须使用 LLM
         if self.use_llm and self.llm_client:
