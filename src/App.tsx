@@ -49,14 +49,22 @@ function App() {
     // 设置聊天消息处理器
     wsService.setChatMessageHandler((msg) => {
       console.log('[App] Received chat message:', msg);
-      setChatMessages(prev => [...prev, {
-        id: msg.id,
-        role: 'assistant',
-        content: msg.content,
-        timestamp: new Date(msg.timestamp),
-        hasToolCall: msg.hasToolCall,
-        thinking: msg.thinking
-      }]);
+      setChatMessages(prev => {
+        const lastUser = [...prev].reverse().find(m => m.role === 'user');
+        const mode = lastUser?.mode;
+        return [
+          ...prev,
+          {
+            id: msg.id,
+            role: 'assistant',
+            content: msg.content,
+            timestamp: new Date(msg.timestamp),
+            mode,
+            hasToolCall: msg.hasToolCall,
+            thinking: msg.thinking
+          }
+        ];
+      });
       // 显示 LLM 原始输出和思考过程
       if (msg.thinking) {
         debugLog('llm', '🧠 LLM 思考过程', msg.thinking, {
@@ -164,7 +172,8 @@ function App() {
       id: crypto.randomUUID(),
       role: 'user',
       content: command,
-      timestamp: new Date()
+      timestamp: new Date(),
+      mode
     };
     setChatMessages(prev => [...prev, userMessage]);
     debugLog('user', `用户输入 (${mode === 'command' ? '命令模式' : '对话模式'}${options?.thinking ? ' + 思考' : ''})`, command);
@@ -219,6 +228,16 @@ function App() {
   const handleLayerToggle = useCallback(() => {
     setIsLayerPanelOpen(prev => !prev);
     setIsMeasurePanelOpen(false);
+  }, []);
+
+  const handleLoadHistory = useCallback((historyMessages: ChatMessage[]) => {
+    setChatMessages(historyMessages);
+  }, []);
+
+  const handleClearMessages = useCallback((mode: ChatMode) => {
+    setChatMessages(prev =>
+      prev.filter(m => m.mode && m.mode !== mode)
+    );
   }, []);
 
   return (
@@ -276,9 +295,10 @@ function App() {
                 onToggle={() => setIsChatOpen(!isChatOpen)}
                 messages={chatMessages}
                 onSendMessage={handleSendCommand}
-                onClearMessages={() => setChatMessages([])}
+                onClearMessages={handleClearMessages}
                 isProcessing={isProcessing}
                 isConnected={wsConnected}
+                onLoadHistory={handleLoadHistory}
               />
 
               {/* 调试面板 - MCP 开发调试用 */}

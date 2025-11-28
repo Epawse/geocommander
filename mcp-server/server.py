@@ -22,7 +22,7 @@ import json
 import os
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from contextlib import asynccontextmanager
 
@@ -35,6 +35,17 @@ from mcp_client import get_mcp_client, init_mcp_client, MCPClient
 
 # Bridge 层 - 原生 Function Calling 支持
 from bridge import get_bridge, LLMBridge, ToolCall, ToolCallStatus
+
+# 简单持久化存储（聊天与工具调用日志）
+from storage import (
+    init_db,
+    log_chat_message,
+    get_recent_logs,
+    get_recent_sessions,
+    get_session_messages,
+    clear_logs,
+    delete_session,
+)
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -849,6 +860,9 @@ class ConnectionManager:
 
     def __init__(self):
         self.active_connections: List[WebSocket] = []
+        # 为每个 WebSocket 维护按模式划分的会话 ID，避免命令/对话混在同一会话中
+        # 结构: { websocket: {"command": str, "conversation": str} }
+        self.sessions: Dict[WebSocket, Dict[str, str]] = {}
         # 通过环境变量控制是否使用 LLM
         use_llm = os.getenv("USE_LLM", "false").lower() == "true"
         self.assistant = ChatAssistant(use_llm=use_llm)
@@ -858,14 +872,25 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        command_id = str(uuid.uuid4())
+        conversation_id = str(uuid.uuid4())
+        self.sessions[websocket] = {
+            "command": command_id,
+            "conversation": conversation_id,
+        }
         print(
-            f"[ConnectionManager] Client connected. Total: {len(self.active_connections)}")
+            f"[ConnectionManager] Client connected. Total: {len(self.active_connections)} "
+            f"(command_session: {command_id}, conversation_session: {conversation_id})"
+        )
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
+        if websocket in self.sessions:
+            self.sessions.pop(websocket, None)
         print(
-            f"[ConnectionManager] Client disconnected. Total: {len(self.active_connections)}")
+            f"[ConnectionManager] Client disconnected. Total: {len(self.active_connections)}"
+        )
 
     async def send_action(self, websocket: WebSocket, tool_call: MCPToolCall):
         """发送动作到客户端"""
@@ -883,7 +908,8 @@ class ConnectionManager:
         response_data = {
             "type": "chat_response",
             "message": message,
-            "timestamp": datetime.now().isoformat()
+            # 使用 UTC 带时区时间戳，前端会显示为本地时间
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
         # 如果有工具调用，附加上去
@@ -909,7 +935,7 @@ class ConnectionManager:
         await websocket.send_json({
             "type": "system",
             "content": content,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
     async def handle_message(self, websocket: WebSocket, data: Dict[str, Any]):
@@ -920,6 +946,22 @@ class ConnectionManager:
             await websocket.send_json({"type": "pong"})
             return
 
+        if msg_type == "switch_session":
+            # 前端在“继续会话”时请求将当前连接绑定到指定的会话 ID
+            payload = data.get("payload") or {}
+            new_session_id = payload.get("session_id")
+            mode = payload.get("mode", "conversation")
+            mode_key = "command" if mode == "command" else "conversation"
+
+            if new_session_id:
+                sessions = self.sessions.get(websocket) or {}
+                sessions[mode_key] = new_session_id
+                self.sessions[websocket] = sessions
+                logger.info(
+                    f"[ConnectionManager] Switched {mode_key} session to {new_session_id}"
+                )
+            return
+
         if msg_type == "user_command":
             payload = data.get("payload", {})
             user_text = payload.get("text", "")
@@ -928,6 +970,26 @@ class ConnectionManager:
 
             print(
                 f"[ConnectionManager] Received message: {user_text} (mode: {mode}, thinking: {thinking})")
+
+            # 记录用户输入：根据模式选择对应的会话 ID，确保命令/对话分离
+            sessions = self.sessions.get(websocket) or {}
+            mode_key = "command" if mode == "command" else "conversation"
+            session_id = sessions.get(mode_key)
+            if session_id is None:
+                session_id = str(uuid.uuid4())
+                sessions[mode_key] = session_id
+                self.sessions[websocket] = sessions
+            try:
+                log_chat_message(
+                    session_id=session_id,
+                    direction="user",
+                    role="user",
+                    message=user_text,
+                    mode=mode,
+                )
+            except Exception:
+                # 持久化失败不影响主流程
+                pass
 
             # 使用 ChatAssistant 处理，传入 mode 和 thinking 参数
             result = await self.assistant.chat(user_text, mode=mode, thinking=thinking)
@@ -946,6 +1008,39 @@ class ConnectionManager:
                 tc = result["tool_call"]
                 print(f"[ConnectionManager] Tool call: {tc['action']}({tc.get('arguments', {})})")
 
+            # 记录 AI 回复与工具调用
+            try:
+                tool_call = result.get("tool_call") or {}
+                tool_action = tool_call.get("action")
+                tool_args = tool_call.get("arguments") or None
+
+                llm_provider_name = None
+                llm_model_name = None
+                try:
+                    from llm_providers import provider_manager
+
+                    provider = provider_manager.get_active()
+                    if provider:
+                        llm_provider_name = provider.name
+                        llm_model_name = provider.model
+                except Exception:
+                    pass
+
+                log_chat_message(
+                    session_id=session_id,
+                    direction="assistant",
+                    role="assistant",
+                    message=result.get("message", ""),
+                    tool_action=tool_action,
+                    tool_arguments=tool_args,
+                    thinking=result.get("thinking"),
+                    llm_provider=llm_provider_name,
+                    llm_model=llm_model_name,
+                    mode=mode,
+                )
+            except Exception:
+                pass
+
         if msg_type == "response":
             # 客户端返回的执行结果
             print(f"[ConnectionManager] Action response: {data}")
@@ -959,6 +1054,13 @@ manager = ConnectionManager()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("🚀 GeoCommander Server starting...")
+
+    # 初始化本地持久化存储（聊天与工具调用日志）
+    try:
+        init_db()
+        print("💾 Chat log database initialized")
+    except Exception as e:
+        print(f"⚠️  Failed to initialize chat log database: {e}")
 
     # 初始化 MCP 客户端
     mcp_command = os.getenv("MCP_SERVER_COMMAND", "python -m mcp_geo_tools")
@@ -1071,6 +1173,144 @@ async def get_locations():
     bridge = get_bridge()
     locations = await bridge.get_locations()
     return {"locations": locations}
+
+
+@app.get("/logs/recent")
+async def get_recent_chat_logs(limit: int = 50):
+    """获取最近的聊天与工具调用日志"""
+    try:
+        # 限制最大查询数量，防止误用
+        safe_limit = max(1, min(limit, 500))
+        # 多取一些底层记录，以便按“单次对话”聚合
+        raw_logs = get_recent_logs(safe_limit * 4)
+
+        # 将单条消息聚合为“单次聊天”（一条用户输入 + 一条助手回复）
+        # 假设记录按 id 单调递增
+        sorted_logs = sorted(raw_logs, key=lambda l: l.get("id", 0))
+        used_assistant_ids = set()
+        turns = []
+
+        for idx, log in enumerate(sorted_logs):
+            if log.get("direction") != "user":
+                continue
+
+            turn = {
+                "id": log.get("id"),
+                "session_id": log.get("session_id"),
+                "mode": log.get("mode"),
+                "user_message": log.get("message") or "",
+                "user_time": log.get("created_at"),
+                "assistant_message": None,
+                "assistant_time": None,
+                "tool_action": None,
+                "tool_arguments": None,
+                "thinking": None,
+                "llm_provider": None,
+                "llm_model": None,
+            }
+
+            # 查找同一 session 下、尚未使用的下一条助手回复
+            for next_log in sorted_logs[idx + 1:]:
+                if (
+                    next_log.get("direction") == "assistant"
+                    and next_log.get("session_id") == log.get("session_id")
+                    and next_log.get("id") not in used_assistant_ids
+                ):
+                    used_assistant_ids.add(next_log.get("id"))
+                    turn["assistant_message"] = next_log.get("message")
+                    turn["assistant_time"] = next_log.get("created_at")
+                    turn["tool_action"] = next_log.get("tool_action")
+                    turn["tool_arguments"] = next_log.get("tool_arguments")
+                    turn["thinking"] = next_log.get("thinking")
+                    turn["llm_provider"] = next_log.get("llm_provider")
+                    turn["llm_model"] = next_log.get("llm_model")
+                    break
+
+            turns.append(turn)
+
+        # 按时间/ID 逆序返回最近的若干条“单次聊天”
+        turns_sorted = sorted(
+            turns,
+            key=lambda t: (t.get("assistant_time") or t.get("user_time") or "", t.get("id") or 0),
+            reverse=True,
+        )
+        turns_limited = turns_sorted[:safe_limit]
+
+        return {
+            "logs": turns_limited,
+            "limit": safe_limit,
+        }
+    except Exception as e:
+        logger.error(f"[Logs] Failed to fetch recent logs: {e}")
+        return {
+            "logs": [],
+            "error": str(e),
+        }
+
+
+@app.get("/logs/sessions")
+async def get_chat_sessions(limit: int = 20):
+    """获取最近的会话列表"""
+    try:
+        safe_limit = max(1, min(limit, 200))
+        sessions = get_recent_sessions(safe_limit)
+        return {
+            "sessions": sessions,
+            "limit": safe_limit,
+        }
+    except Exception as e:
+        logger.error(f"[Logs] Failed to fetch sessions: {e}")
+        return {
+            "sessions": [],
+            "error": str(e),
+        }
+
+
+@app.get("/logs/session/{session_id}")
+async def get_chat_session(session_id: str):
+    """获取指定会话的完整消息"""
+    try:
+        messages = get_session_messages(session_id)
+        return {
+            "session_id": session_id,
+            "messages": messages,
+        }
+    except Exception as e:
+        logger.error(f"[Logs] Failed to fetch session {session_id}: {e}")
+        return {
+            "session_id": session_id,
+            "messages": [],
+            "error": str(e),
+        }
+
+
+@app.post("/logs/clear")
+async def clear_chat_logs():
+    """清空所有聊天与工具调用日志"""
+    try:
+        clear_logs()
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"[Logs] Failed to clear logs: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+@app.post("/logs/session/{session_id}/delete")
+async def delete_chat_session(session_id: str):
+    """删除指定会话的所有日志"""
+    try:
+        delete_session(session_id)
+        return {"success": True, "session_id": session_id}
+    except Exception as e:
+        logger.error(f"[Logs] Failed to delete session {session_id}: {e}")
+        return {
+            "success": False,
+            "session_id": session_id,
+            "error": str(e),
+        }
 
 
 # ===================== MCP 相关端点 =====================
