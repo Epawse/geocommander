@@ -158,7 +158,3 @@ VERTEX_MODEL=gemini-2.5-flash-lite
 MIT
 
 ---
-
-## Related Projects
-
-- [mcp-geo-tools](https://github.com/epawse/mcp-geo-tools) - Standard MCP Server implementation (planned)
